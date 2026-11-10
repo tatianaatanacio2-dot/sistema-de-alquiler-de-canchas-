@@ -1,0 +1,20 @@
+/.local/
+**/.env*
+!**/.env.example
+*.apk
+*.aab
+*.jks
+*.keystore
+google-services.json
+/backend/public/assets/
+/backend/public/index.html
+/backend/bootstrap/cache/*
+!/backend/bootstrap/cache/.gitignore
+
+# Archivos de la versión PHP anterior.
+/datos.php
+/estilos.css
+/formulario.php
+/index.php
+/interfaz.js
+/vista.php

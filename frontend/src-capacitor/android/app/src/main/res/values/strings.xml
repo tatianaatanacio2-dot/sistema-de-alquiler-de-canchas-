@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Alquiler de cancha</string>
+    <string name="title_activity_main">Alquiler de cancha</string>
+    <string name="package_name">pe.alquilercancha.app</string>
+    <string name="custom_url_scheme">pe.alquilercancha.app</string>
+</resources>
