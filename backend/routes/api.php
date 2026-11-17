@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccesoController;
 use App\Http\Controllers\AlquilerController;
+use App\Http\Controllers\FinanzasController;
 use App\Http\Middleware\SesionAdministrador;
 use Illuminate\Support\Facades\Route;
 
@@ -24,4 +25,10 @@ Route::middleware(SesionAdministrador::class)->group(function () {
     Route::post('reservas', [AlquilerController::class, 'guardarReserva']);
     Route::put('reservas/{id}', [AlquilerController::class, 'guardarReserva'])->whereNumber('id');
     Route::patch('reservas/{id}/estado', [AlquilerController::class, 'cerrarReserva'])->whereNumber('id');
+    Route::get('pagos', [FinanzasController::class, 'pagos']);
+    Route::post('pagos', [FinanzasController::class, 'guardarPago']);
+    Route::get('caja', [FinanzasController::class, 'caja']);
+    Route::post('gastos', [FinanzasController::class, 'guardarGasto']);
+    Route::patch('gastos/{id}/anular', [FinanzasController::class, 'anularGasto'])->whereNumber('id');
+    Route::get('historial', [FinanzasController::class, 'historial']);
 });

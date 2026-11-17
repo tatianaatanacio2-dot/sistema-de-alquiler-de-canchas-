@@ -2,6 +2,10 @@
 
 Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reservas con horarios sin cruces e historial de cancelaciones. La tarifa inicial es S/ 30 por hora y la agenda usa la hora de Bogotá.
 
+La rama `tatiana` incorpora Pagos, Caja diaria e Historial de cambios. Los cobros admiten adelantos y devoluciones en efectivo, Yape, Plin, transferencia o tarjeta. Caja muestra cobros, devoluciones, gastos y neto por día y método. Los cambios realizados desde la activación del historial guardan el usuario y los valores anteriores y nuevos.
+
+Para actualizar una instalación existente, ejecuta `php artisan migrate --force` dentro de `backend`, con PHP 8.3 o superior, y después compila la interfaz con `compilar.ps1`. Cancelar una reserva conserva los pagos y permite registrar la devolución desde Pagos. Los gastos pueden anularse conservando su registro.
+
 ## Instalación en Windows
 
 1. Descarga el paquete **Sistema-alquiler-de-canchas.zip** desde [Entregas](../../releases/latest) y descomprímelo. Incluye Laravel, la interfaz Quasar compilada y las dependencias PHP de producción.
@@ -12,6 +16,7 @@ Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reser
    $php = 'C:\ruta\a\php.exe'
    Copy-Item backend\.env.example backend\.env
    & $php backend\artisan key:generate
+   & $php backend\artisan migrate --force
    powershell -ExecutionPolicy Bypass -File .\iniciar.ps1 -Php $php
    ```
 

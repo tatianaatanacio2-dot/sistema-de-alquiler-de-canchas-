@@ -42,6 +42,9 @@ const navegacion = [
   { ruta: '/cancha', nombre: 'Mi cancha', icono: 'sports_soccer' },
   { ruta: '/clientes', nombre: 'Clientes', icono: 'people_outline' },
   { ruta: '/reservas', nombre: 'Reservas', icono: 'calendar_month' },
+  { ruta: '/pagos', nombre: 'Pagos', icono: 'payments' },
+  { ruta: '/caja', nombre: 'Caja diaria', icono: 'account_balance_wallet' },
+  { ruta: '/historial', nombre: 'Historial de cambios', icono: 'history' },
 ];
 
 async function salir() {

@@ -22,6 +22,7 @@
           <q-badge outline :color="colores[props.row.estado as Estado]" :label="estados[props.row.estado as Estado]" />
         </q-td></template>
         <template #body-cell-acciones="props"><q-td :props="props">
+          <q-btn flat dense no-caps color="primary" icon="payments" label="Pagos" :to="{ path: '/pagos', query: { reserva: String(props.row.id) } }" />
           <div v-if="props.row.estado === 'confirmada'" class="row no-wrap justify-end">
             <q-btn flat dense no-caps color="primary" icon="edit" label="Editar" @click="editar(props.row)" />
             <q-btn v-if="props.row.fin <= horaLocal()" flat dense no-caps color="green-9" label="Completar" @click="cambiarEstado(props.row, 'completada')" />
@@ -175,7 +176,7 @@ function cambiarEstado(reserva: Reserva, destino: 'completada' | 'cancelada') {
   const cancelar = destino === 'cancelada';
   q.dialog({
     title: cancelar ? 'Cancelar reserva' : 'Completar reserva',
-    message: cancelar ? 'El horario quedará libre y la reserva se conservará en el historial.' : 'La reserva quedará marcada como completada.',
+    message: cancelar ? 'El horario quedará libre. Si ya hubo pagos, registra la devolución correspondiente en Pagos.' : 'La reserva quedará marcada como completada.',
     cancel: { label: 'Volver', flat: true, noCaps: true },
     ok: { label: cancelar ? 'Cancelar reserva' : 'Completar', color: cancelar ? 'negative' : 'primary', noCaps: true },
   }).onOk(async () => {

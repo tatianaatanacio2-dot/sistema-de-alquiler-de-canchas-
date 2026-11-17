@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Historial;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
@@ -57,7 +58,11 @@ class AlquilerController
             'tarifa' => ['required', 'integer', 'between:1,100000000'],
             'activa' => ['required', 'boolean'],
         ]);
-        DB::table('canchas')->where('id', 1)->update($datos);
+        DB::transaction(function () use ($datos) {
+            $antes = DB::table('canchas')->where('id', 1)->lockForUpdate()->first();
+            DB::table('canchas')->where('id', 1)->update($datos);
+            Historial::registrar('cancha', 1, 'Editar cancha', $antes);
+        });
 
         return $this->cancha();
     }
@@ -70,15 +75,19 @@ class AlquilerController
     public function guardarCliente(Request $request, ?int $id = null): JsonResponse
     {
         $datos = array_map(fn ($valor) => $valor ?? '', $request->validate(self::CAMPOS_CLIENTE));
-        $clientes = DB::table('clientes');
-        if ($id === null) {
-            $id = $this->insertarCliente($datos);
-        } else {
-            abort_unless($clientes->find($id), 404, 'El cliente no existe.');
-            if ($datos !== []) {
-                $clientes->where('id', $id)->update($datos);
+        $id = DB::transaction(function () use ($datos, $id) {
+            if ($id === null) {
+                return $this->insertarCliente($datos);
             }
-        }
+            $antes = DB::table('clientes')->where('id', $id)->lockForUpdate()->first();
+            abort_unless($antes, 404, 'El cliente no existe.');
+            if ($datos !== []) {
+                DB::table('clientes')->where('id', $id)->update($datos);
+            }
+            Historial::registrar('clientes', $id, 'Editar cliente', $antes);
+
+            return $id;
+        });
 
         return response()->json(DB::table('clientes')->find($id));
     }
@@ -147,11 +156,17 @@ class AlquilerController
             $minutos = intdiv($fin->getTimestamp() - $inicio->getTimestamp(), 60);
             $centimosPorHora = $tarifa * 100;
             $centimos = intdiv($minutos, 60) * $centimosPorHora + intdiv(($minutos % 60) * $centimosPorHora + 30, 60);
+            abort_if($id !== null && $centimos < FinanzasController::abonado($id), 409,
+                'El nuevo total es menor al importe abonado. Registra primero la devolución correspondiente en Pagos.');
             $valores = $datos + ['tarifa' => $tarifa, 'total' => sprintf('%d.%02d', intdiv($centimos, 100), $centimos % 100)];
             if ($id === null) {
-                return DB::table('reservas')->insertGetId($valores + ['cancha_id' => 1]);
+                $id = DB::table('reservas')->insertGetId($valores + ['cancha_id' => 1]);
+                Historial::registrar('reservas', $id, 'Crear reserva');
+
+                return $id;
             }
             DB::table('reservas')->where('id', $id)->update($valores);
+            Historial::registrar('reservas', $id, 'Editar reserva', $anterior);
 
             return $id;
         }, 3);
@@ -172,6 +187,7 @@ class AlquilerController
             abort_unless($reserva->estado === 'confirmada', 409, 'La reserva ya está cerrada.');
             abort_if($estado === 'completada' && $reserva->fin > now()->format(self::HORARIO), 409, 'Podrás completarla cuando termine su horario.');
             DB::table('reservas')->where('id', $id)->update(['estado' => $estado]);
+            Historial::registrar('reservas', $id, $estado === 'cancelada' ? 'Cancelar reserva' : 'Completar reserva', $reserva);
         }, 3);
 
         return response()->json($this->agenda()->where('r.id', $id)->first());
@@ -181,11 +197,16 @@ class AlquilerController
     {
         return DB::table('reservas as r')->leftJoin('clientes as c', 'c.id', '=', 'r.cliente_id')
             ->select('r.*')
-            ->selectRaw("COALESCE(NULLIF(c.nombre, ''), NULLIF(c.dni, ''), NULLIF(c.telefono, ''), CONCAT('Cliente #', c.id), 'Sin cliente') AS cliente");
+            ->selectSub(DB::table('pagos')->whereColumn('reserva_id', 'r.id')
+                ->selectRaw("COALESCE(SUM(CASE WHEN tipo = 'cobro' THEN monto ELSE -monto END), 0)"), 'abonado')
+            ->selectRaw("COALESCE(NULLIF(c.nombre, ''), NULLIF(c.dni, ''), NULLIF(c.telefono, ''), CASE WHEN c.id IS NULL THEN 'Sin cliente' ELSE CONCAT('Cliente #', c.id) END) AS cliente");
     }
 
     private function insertarCliente(array $datos): int
     {
-        return DB::table('clientes')->insertGetId($datos + ['dni' => '', 'nombre' => '', 'telefono' => '', 'correo' => '']);
+        $id = DB::table('clientes')->insertGetId($datos + ['dni' => '', 'nombre' => '', 'telefono' => '', 'correo' => '']);
+        Historial::registrar('clientes', $id, 'Crear cliente');
+
+        return $id;
     }
 }
