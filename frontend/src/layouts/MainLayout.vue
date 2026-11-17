@@ -2,8 +2,7 @@
   <q-layout view="lHh Lpr lFf">
     <q-header class="topbar">
       <q-toolbar>
-        <q-btn v-if="!movil" flat round icon="menu" aria-label="Mostrar u ocultar menú" @click="drawer = !drawer" />
-        <div v-else class="brand-icon"><q-icon name="sports_soccer" size="21px" /></div>
+        <q-btn flat round icon="menu" aria-label="Mostrar u ocultar menú" @click="drawer = !drawer" />
         <q-toolbar-title>{{ movil ? 'Canchas' : route.meta.title }}</q-toolbar-title>
         <span v-if="!movil" class="today">{{ hoy }}</span>
         <q-btn flat round aria-label="Menú de cuenta" class="account-button">
@@ -21,10 +20,10 @@
         </q-btn>
       </q-toolbar>
     </q-header>
-    <q-drawer v-if="!movil" v-model="drawer" show-if-above :breakpoint="1023" :width="230" class="sidebar">
+    <q-drawer v-model="drawer" show-if-above :breakpoint="1023" :width="230" class="sidebar">
       <router-link to="/" class="brand"><div class="brand-icon"><q-icon name="sports_soccer" size="27px" /></div><div>Canchas<span>Alquiler deportivo</span></div></router-link>
-      <q-list class="nav-list">
-        <q-item v-for="item in navegacion" :key="item.ruta" clickable :to="item.ruta" exact active-class="nav-active">
+      <q-list class="nav-list scroll">
+        <q-item v-for="item in [...navegacion, ...gestion]" :key="item.ruta" clickable :to="item.ruta" exact active-class="nav-active">
           <q-item-section avatar><q-icon :name="item.icono" size="21px" /></q-item-section>
           <q-item-section>{{ item.nombre }}</q-item-section>
         </q-item>
@@ -56,6 +55,13 @@ const navegacion = [
   { ruta: '/reservas', nombre: 'Reservas', icono: 'calendar_month' },
   { ruta: '/clientes', nombre: 'Clientes', icono: 'people_outline' },
   { ruta: '/cancha', nombre: 'Cancha', icono: 'sports_soccer' },
+];
+const gestion = [
+  { ruta: '/agenda', nombre: 'Agenda y disponibilidad', icono: 'event_available' },
+  { ruta: '/pagos', nombre: 'Pagos', icono: 'payments' },
+  { ruta: '/caja', nombre: 'Caja diaria', icono: 'account_balance_wallet' },
+  { ruta: '/historial', nombre: 'Historial de cambios', icono: 'history' },
+  { ruta: '/reportes', nombre: 'Reportes', icono: 'assessment' },
 ];
 
 async function salir() {

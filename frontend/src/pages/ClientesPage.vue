@@ -26,13 +26,17 @@
                 </dl>
               </q-card-section>
               <q-card-actions class="record-actions">
+                <q-btn flat no-caps color="primary" icon="history" label="Historial" :to="'/clientes/' + row.id + '/historial'" />
                 <q-btn flat no-caps color="primary" icon="edit" label="Editar" @click="editar(row)" />
               </q-card-actions>
             </q-card>
           </div>
         </template>
         <template #body-cell-acciones="props">
-          <q-td :props="props"><q-btn flat dense no-caps color="primary" icon="edit" label="Editar" @click="editar(props.row)" /></q-td>
+          <q-td :props="props">
+            <q-btn flat dense no-caps color="primary" icon="history" label="Historial" :to="'/clientes/' + props.row.id + '/historial'" />
+            <q-btn flat dense no-caps color="primary" icon="edit" label="Editar" @click="editar(props.row)" />
+          </q-td>
         </template>
       </q-table>
     </section>
