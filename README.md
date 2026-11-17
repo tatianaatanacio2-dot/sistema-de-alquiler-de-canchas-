@@ -8,6 +8,10 @@ Para actualizar una instalación existente, ejecuta `php artisan migrate --force
 
 En Nueva reserva puedes registrar el adelanto o el pago completo y seleccionar el método de pago. La reserva y su cobro se guardan juntos. El listado muestra el importe abonado, el saldo y el último método utilizado.
 
+Agenda y disponibilidad muestra los horarios ocupados y los intervalos libres, y permite preparar una nueva reserva. El Resumen incluye los cobros, gastos, neto del día y saldos por cobrar.
+
+Para cargar datos ficticios de uso diario, ejecuta `php artisan canchas:demostracion` desde `backend`. Agrega ejemplos para hoy y los siguientes seis días, reutiliza los ya creados y evita horarios ocupados. Los cobros y gastos se identifican con DEMO y el historial usa el usuario Demostración.
+
 ## Instalación en Windows
 
 1. Descarga el paquete **Sistema-alquiler-de-canchas.zip** desde [Entregas](../../releases/latest) y descomprímelo. Incluye Laravel, la interfaz Quasar compilada y las dependencias PHP de producción.

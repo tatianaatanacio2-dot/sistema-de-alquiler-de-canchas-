@@ -10,6 +10,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'cancha', component: () => import('@/pages/CanchaPage.vue'), meta: { title: 'Mi cancha' } },
       { path: 'clientes', component: () => import('@/pages/ClientesPage.vue'), meta: { title: 'Clientes' } },
       { path: 'reservas', component: () => import('@/pages/ReservasPage.vue'), meta: { title: 'Reservas' } },
+      { path: 'agenda', component: () => import('@/pages/AgendaPage.vue'), meta: { title: 'Agenda y disponibilidad' } },
       { path: 'pagos', component: () => import('@/pages/PagosPage.vue'), meta: { title: 'Pagos' } },
       { path: 'caja', component: () => import('@/pages/CajaPage.vue'), meta: { title: 'Caja diaria' } },
       { path: 'historial', component: () => import('@/pages/HistorialPage.vue'), meta: { title: 'Historial de cambios' } },

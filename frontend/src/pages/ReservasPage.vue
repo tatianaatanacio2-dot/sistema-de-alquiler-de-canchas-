@@ -2,7 +2,10 @@
   <q-page class="workspace">
     <div class="page-heading">
       <div><span class="eyebrow">GESTIÓN DE ALQUILERES</span><h1>Reservas</h1><p>Consulta la agenda y el historial de la cancha.</p></div>
-      <q-btn color="primary" unelevated no-caps icon="add" label="Nueva reserva" @click="editar()" />
+      <div class="row q-gutter-sm">
+        <q-btn outline color="primary" no-caps icon="event_available" label="Horarios libres" to="/agenda" />
+        <q-btn color="primary" unelevated no-caps icon="add" label="Nueva reserva" @click="editar()" />
+      </div>
     </div>
     <q-banner v-if="error" rounded class="bg-red-1 text-red-9 q-mb-md" role="alert">{{ error }}</q-banner>
     <section class="panel">
@@ -231,8 +234,14 @@ watch([fecha, estado], cargar);
 onMounted(async () => {
   await cargar();
   if (route.query.nueva) {
+    const inicio = typeof route.query.inicio === 'string' ? route.query.inicio : '';
+    const fin = typeof route.query.fin === 'string' ? route.query.fin : '';
     await router.replace('/reservas');
     await editar();
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(inicio) && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(fin)) {
+      datos.value.inicio = inicio;
+      datos.value.fin = fin;
+    }
   }
 });
 </script>

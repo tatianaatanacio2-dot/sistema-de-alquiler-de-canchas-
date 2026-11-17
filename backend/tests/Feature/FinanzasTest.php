@@ -193,4 +193,46 @@ class FinanzasTest extends TestCase
         $this->assertDatabaseCount('pagos', 0);
         $this->assertDatabaseCount('historial', 0);
     }
+
+    public function test_disponibilidad_excluye_canceladas_y_recorta_intervalos_pasados(): void
+    {
+        $this->getJson('/api/disponibilidad?fecha=2026-11-12')->assertOk()
+            ->assertJsonPath('libres.0.inicio', '2026-11-12T00:00')->assertJsonPath('libres.0.fin', '2026-11-12T18:00')
+            ->assertJsonPath('libres.1.inicio', '2026-11-12T20:00')->assertJsonPath('libres.1.fin', '2026-11-13T00:00');
+        DB::table('reservas')->insert([
+            ['cancha_id' => 1, 'inicio' => '2026-11-11T23:00', 'fin' => '2026-11-12T01:00', 'tarifa' => 30, 'total' => 60, 'estado' => 'confirmada'],
+            ['cancha_id' => 1, 'inicio' => '2026-11-12T20:00', 'fin' => '2026-11-12T21:00', 'tarifa' => 30, 'total' => 30, 'estado' => 'cancelada'],
+        ]);
+        $this->getJson('/api/disponibilidad?fecha=2026-11-12')->assertOk()
+            ->assertJsonCount(2, 'ocupados')->assertJsonPath('libres.0.inicio', '2026-11-12T01:00')
+            ->assertJsonPath('libres.1.inicio', '2026-11-12T20:00');
+        $this->getJson('/api/disponibilidad?fecha=2026-11-11')->assertOk()
+            ->assertJsonPath('libres.0.inicio', '2026-11-11T10:00');
+        $this->getJson('/api/disponibilidad?fecha=2026-11-10')->assertOk()->assertJsonCount(0, 'libres');
+        DB::table('canchas')->where('id', 1)->update(['activa' => false]);
+        $this->getJson('/api/disponibilidad?fecha=2026-11-12')->assertOk()->assertJsonCount(0, 'libres');
+    }
+
+    public function test_demostracion_es_reutilizable_y_actualiza_el_resumen(): void
+    {
+        $this->artisan('canchas:demostracion')->assertSuccessful();
+        $tablas = ['clientes', 'reservas', 'pagos', 'gastos', 'historial'];
+        $cantidades = [];
+        foreach ($tablas as $tabla) {
+            $cantidades[$tabla] = DB::table($tabla)->count();
+        }
+        $this->artisan('canchas:demostracion')->assertSuccessful();
+        foreach ($cantidades as $tabla => $cantidad) {
+            $this->assertDatabaseCount($tabla, $cantidad);
+        }
+        $this->getJson('/api/resumen')->assertOk()->assertJsonPath('demostracion', true)
+            ->assertJsonPath('cajaHoy.gastos', '27.50');
+        $this->assertDatabaseHas('reservas', ['estado' => 'completada']);
+        $this->assertDatabaseHas('reservas', ['estado' => 'cancelada']);
+        $this->assertDatabaseHas('historial', ['usuario' => 'Demostración']);
+        $cruces = DB::table('reservas as a')->join('reservas as b', function ($join) {
+            $join->on('a.id', '<', 'b.id')->on('a.inicio', '<', 'b.fin')->on('a.fin', '>', 'b.inicio');
+        })->where('a.estado', '<>', 'cancelada')->where('b.estado', '<>', 'cancelada')->count();
+        $this->assertSame(0, $cruces);
+    }
 }

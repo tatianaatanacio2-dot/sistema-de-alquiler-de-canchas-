@@ -22,6 +22,7 @@ Route::middleware(SesionAdministrador::class)->group(function () {
     Route::post('clientes', [AlquilerController::class, 'guardarCliente']);
     Route::put('clientes/{id}', [AlquilerController::class, 'guardarCliente'])->whereNumber('id');
     Route::get('reservas', [AlquilerController::class, 'reservas']);
+    Route::get('disponibilidad', [AlquilerController::class, 'disponibilidad']);
     Route::post('reservas', [AlquilerController::class, 'guardarReserva']);
     Route::put('reservas/{id}', [AlquilerController::class, 'guardarReserva'])->whereNumber('id');
     Route::patch('reservas/{id}/estado', [AlquilerController::class, 'cerrarReserva'])->whereNumber('id');

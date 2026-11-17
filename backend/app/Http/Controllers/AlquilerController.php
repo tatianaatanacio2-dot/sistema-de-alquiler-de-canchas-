@@ -33,14 +33,21 @@ class AlquilerController
         $reservasHoy = $this->agenda()->where('r.estado', '<>', 'cancelada')
             ->where('r.inicio', '<', $ahora->copy()->addDay()->format('Y-m-d\T00:00'))
             ->where('r.fin', '>', $hoy.'T00:00');
+        $saldoPendiente = DB::query()->fromSub($this->agenda(), 'agenda')->where('estado', '<>', 'cancelada')
+            ->selectRaw('COALESCE(SUM(CASE WHEN total > abonado THEN total - abonado ELSE 0 END), 0) AS saldo')->value('saldo');
+        $caja = app(FinanzasController::class)->caja(Request::create('/api/caja', 'GET', ['fecha' => $hoy]))->getData(true);
 
         return response()->json([
             'fecha' => $hoy,
+            'ahora' => $ahora->format(self::HORARIO),
             'zonaHoraria' => config('app.timezone'),
             'cancha' => DB::table('canchas')->find(1),
             'clientes' => DB::table('clientes')->count(),
             'totalHoy' => (clone $reservasHoy)->count(),
             'totalProximas' => (clone $proximas)->count(),
+            'saldoPendiente' => (string) $saldoPendiente,
+            'cajaHoy' => $caja['totales'],
+            'demostracion' => DB::table('pagos')->where('nota', 'like', 'DEMO %')->exists(),
             'hoy' => $reservasHoy->orderBy('r.inicio')->get(),
             'proximas' => $proximas->orderBy('r.inicio')->limit(5)->get(),
         ]);
@@ -49,6 +56,35 @@ class AlquilerController
     public function cancha(): JsonResponse
     {
         return response()->json(DB::table('canchas')->find(1));
+    }
+
+    public function disponibilidad(Request $request): JsonResponse
+    {
+        $fecha = $request->validate(['fecha' => ['required', 'date_format:Y-m-d']])['fecha'];
+        $dia = CarbonImmutable::parse($fecha);
+        $finDia = $dia->addDay();
+        $ocupados = DB::table('reservas')->where('estado', '<>', 'cancelada')
+            ->where('inicio', '<', $finDia->format(self::HORARIO))->where('fin', '>', $dia->format(self::HORARIO))
+            ->orderBy('inicio')->get(['id', 'inicio', 'fin', 'estado']);
+        $cursor = max($dia->format(self::HORARIO), now()->format(self::HORARIO));
+        $hasta = $finDia->format(self::HORARIO);
+        $libres = [];
+        foreach ($ocupados as $reserva) {
+            if ($cursor < $reserva->inicio && $cursor < $hasta) {
+                $libres[] = ['inicio' => $cursor, 'fin' => min($reserva->inicio, $hasta)];
+            }
+            $cursor = max($cursor, $reserva->fin);
+        }
+        if ($cursor < $hasta) {
+            $libres[] = ['inicio' => $cursor, 'fin' => $hasta];
+        }
+        $cancha = DB::table('canchas')->find(1);
+
+        return response()->json([
+            'fecha' => $fecha, 'ocupados' => $ocupados,
+            'libres' => $cancha && $cancha->activa && $cancha->tarifa ? $libres : [],
+            'disponible' => (bool) ($cancha && $cancha->activa && $cancha->tarifa),
+        ]);
     }
 
     public function guardarCancha(Request $request): JsonResponse
