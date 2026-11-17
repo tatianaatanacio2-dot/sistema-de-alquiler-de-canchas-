@@ -115,6 +115,7 @@ class AlquilerController
         $datos = $request->validate([
             'cliente_id' => ['nullable', 'integer', 'exists:clientes,id', 'prohibits:cliente_nuevo'],
             'cliente_nuevo' => ['nullable', 'array:dni,nombre,telefono'],
+            'pago_inicial' => ['nullable', 'array:operacion,monto,metodo,nota'],
             'inicio' => ['required', 'date_format:'.self::HORARIO],
             'fin' => ['required', 'date_format:'.self::HORARIO, 'after:inicio'],
         ], [
@@ -124,8 +125,10 @@ class AlquilerController
         ]);
         $nuevoCliente = array_map(fn ($valor) => $valor ?? '',
             Validator::make($datos['cliente_nuevo'] ?? [], self::CAMPOS_CLIENTE)->validate());
-        unset($datos['cliente_nuevo']);
-        $id = DB::transaction(function () use ($datos, $nuevoCliente, $id) {
+        $pagoInicial = $datos['pago_inicial'] ?? null;
+        abort_if($id !== null && $pagoInicial !== null, 422, 'Registra los pagos de una reserva existente desde Pagos.');
+        unset($datos['cliente_nuevo'], $datos['pago_inicial']);
+        $id = DB::transaction(function () use ($datos, $nuevoCliente, $pagoInicial, $id) {
             $cancha = DB::table('canchas')->where('id', 1)->lockForUpdate()->first();
             abort_unless($cancha, 409, 'La cancha necesita configuración.');
             $anterior = $id === null ? null : DB::table('reservas')->find($id);
@@ -162,6 +165,10 @@ class AlquilerController
             if ($id === null) {
                 $id = DB::table('reservas')->insertGetId($valores + ['cancha_id' => 1]);
                 Historial::registrar('reservas', $id, 'Crear reserva');
+                if ($pagoInicial !== null) {
+                    app(FinanzasController::class)->guardarPago(Request::create('/api/pagos', 'POST',
+                        $pagoInicial + ['reserva_id' => $id, 'tipo' => 'cobro']));
+                }
 
                 return $id;
             }
@@ -199,6 +206,8 @@ class AlquilerController
             ->select('r.*')
             ->selectSub(DB::table('pagos')->whereColumn('reserva_id', 'r.id')
                 ->selectRaw("COALESCE(SUM(CASE WHEN tipo = 'cobro' THEN monto ELSE -monto END), 0)"), 'abonado')
+            ->selectSub(DB::table('pagos')->whereColumn('reserva_id', 'r.id')->where('tipo', 'cobro')
+                ->orderByDesc('id')->limit(1)->select('metodo'), 'metodo_pago')
             ->selectRaw("COALESCE(NULLIF(c.nombre, ''), NULLIF(c.dni, ''), NULLIF(c.telefono, ''), CASE WHEN c.id IS NULL THEN 'Sin cliente' ELSE CONCAT('Cliente #', c.id) END) AS cliente");
     }
 

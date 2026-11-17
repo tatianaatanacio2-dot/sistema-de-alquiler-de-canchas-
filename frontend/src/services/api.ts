@@ -6,7 +6,7 @@ export type Cliente = { id: number; dni: string; nombre: string; telefono: strin
 export type Estado = 'confirmada' | 'cancelada' | 'completada';
 export type Reserva = {
   id: number; cliente_id: number | null; cliente: string; inicio: string; fin: string;
-  tarifa: number; total: string; estado: Estado; abonado: string;
+  tarifa: number; total: string; estado: Estado; abonado: string; metodo_pago: string | null;
 };
 export type Acceso = { requiereCuenta: boolean; equipoLocal: boolean };
 type Credenciales = { token: string; usuario: Usuario };

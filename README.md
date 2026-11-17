@@ -6,6 +6,8 @@ La rama `tatiana` incorpora Pagos, Caja diaria e Historial de cambios. Los cobro
 
 Para actualizar una instalación existente, ejecuta `php artisan migrate --force` dentro de `backend`, con PHP 8.3 o superior, y después compila la interfaz con `compilar.ps1`. Cancelar una reserva conserva los pagos y permite registrar la devolución desde Pagos. Los gastos pueden anularse conservando su registro.
 
+En Nueva reserva puedes registrar el adelanto o el pago completo y seleccionar el método de pago. La reserva y su cobro se guardan juntos. El listado muestra el importe abonado, el saldo y el último método utilizado.
+
 ## Instalación en Windows
 
 1. Descarga el paquete **Sistema-alquiler-de-canchas.zip** desde [Entregas](../../releases/latest) y descomprímelo. Incluye Laravel, la interfaz Quasar compilada y las dependencias PHP de producción.

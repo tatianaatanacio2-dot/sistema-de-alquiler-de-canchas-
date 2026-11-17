@@ -153,4 +153,44 @@ class FinanzasTest extends TestCase
         }
         $this->assertDatabaseCount('pagos', 0);
     }
+
+    public function test_reserva_con_adelanto_guarda_pago_caja_e_historial(): void
+    {
+        $datos = [
+            'inicio' => '2026-11-13T16:00', 'fin' => '2026-11-13T17:30',
+            'cliente_nuevo' => ['nombre' => 'Cliente con adelanto'],
+            'pago_inicial' => [
+                'operacion' => (string) Str::uuid(), 'monto' => '20.50',
+                'metodo' => 'yape', 'nota' => 'Operación de ejemplo',
+            ],
+        ];
+        $reserva = $this->postJson('/api/reservas', $datos)->assertOk()->assertJsonPath('metodo_pago', 'yape');
+        $this->assertEquals(20.50, $reserva->json('abonado'));
+        $this->assertEquals(45, $reserva->json('total'));
+        $this->assertDatabaseHas('pagos', [
+            'reserva_id' => $reserva->json('id'), 'tipo' => 'cobro', 'metodo' => 'yape', 'nota' => 'Operación de ejemplo',
+        ]);
+        $this->getJson('/api/caja')->assertOk()->assertJsonPath('porMetodo.yape.ingresos', '20.50');
+        $this->assertDatabaseCount('historial', 3);
+        $this->postJson('/api/reservas', $datos)->assertStatus(409);
+        $this->assertDatabaseCount('pagos', 1);
+        $this->assertDatabaseCount('clientes', 1);
+    }
+
+    public function test_pago_inicial_invalido_revierte_toda_la_reserva(): void
+    {
+        $datos = [
+            'inicio' => '2026-11-13T16:00', 'fin' => '2026-11-13T17:00',
+            'cliente_nuevo' => ['nombre' => 'Cliente de prueba'],
+            'pago_inicial' => ['operacion' => (string) Str::uuid(), 'monto' => '30.01', 'metodo' => 'efectivo'],
+        ];
+        $this->postJson('/api/reservas', $datos)->assertStatus(409);
+        $datos['pago_inicial']['monto'] = '20.00';
+        $datos['pago_inicial']['metodo'] = 'otro';
+        $this->postJson('/api/reservas', $datos)->assertStatus(422);
+        $this->assertDatabaseCount('reservas', 1);
+        $this->assertDatabaseCount('clientes', 0);
+        $this->assertDatabaseCount('pagos', 0);
+        $this->assertDatabaseCount('historial', 0);
+    }
 }

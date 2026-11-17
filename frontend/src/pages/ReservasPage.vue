@@ -21,6 +21,10 @@
         <template #body-cell-estado="props"><q-td :props="props">
           <q-badge outline :color="colores[props.row.estado as Estado]" :label="estados[props.row.estado as Estado]" />
         </q-td></template>
+        <template #body-cell-pago="props"><q-td :props="props">
+          <q-badge outline :color="estadoPago(props.row).color" :label="estadoPago(props.row).label" />
+          <small class="block q-mt-xs">{{ props.row.metodo_pago ? nombreMetodo(props.row.metodo_pago) : 'Sin pago registrado' }}</small>
+        </q-td></template>
         <template #body-cell-acciones="props"><q-td :props="props">
           <q-btn flat dense no-caps color="primary" icon="payments" label="Pagos" :to="{ path: '/pagos', query: { reserva: String(props.row.id) } }" />
           <div v-if="props.row.estado === 'confirmada'" class="row no-wrap justify-end">
@@ -71,10 +75,30 @@
               <span class="text-caption text-grey-7">Hora de Bogotá · {{ dinero(tarifa) }} por hora</span>
               <strong v-if="importe !== null">Total estimado {{ dinero(importe) }}</strong>
             </div>
+            <template v-if="!datos.id">
+              <q-separator class="full-field" />
+              <div class="full-field">
+                <q-toggle v-model="cobrarAhora" color="primary" label="Registrar un pago al reservar" />
+                <p class="text-caption text-grey-7 q-mb-none">Registra el dinero que ya recibiste del cliente.</p>
+              </div>
+              <template v-if="cobrarAhora">
+                <q-select v-model="modalidadPago" outlined label="Tipo de pago" emit-value map-options
+                  :options="[{ label: 'Adelanto', value: 'adelanto' }, { label: 'Pago completo', value: 'completo' }]" />
+                <q-select v-model="pago.metodo" outlined :options="metodos" emit-value map-options label="Método de pago" />
+                <q-input v-model="pago.monto" outlined type="number" min="0.01" step="0.01" prefix="S/" label="Importe recibido"
+                  :readonly="modalidadPago === 'completo'" :rules="[validarMonto, v => importe !== null && Number(v) <= importe || 'El pago supera el total de la reserva']" />
+                <q-input v-model="pago.nota" outlined maxlength="250"
+                  :label="pago.metodo === 'efectivo' ? 'Nota (opcional)' : 'Referencia o número de operación (opcional)'" />
+              </template>
+              <div v-if="importe !== null" class="full-field bg-cyan-1 rounded-borders q-pa-md row justify-between items-center">
+                <span>{{ cobrarAhora ? 'Saldo después del pago' : 'Saldo pendiente' }}</span>
+                <strong>{{ dinero(Math.max(0, importe - (cobrarAhora ? Number(pago.monto) || 0 : 0))) }}</strong>
+              </div>
+            </template>
           </q-card-section>
           <q-card-actions align="right">
             <q-btn flat no-caps label="Cerrar" v-close-popup :disable="guardando" />
-            <q-btn color="primary" unelevated no-caps label="Guardar reserva" type="submit" :loading="guardando" />
+            <q-btn color="primary" unelevated no-caps :label="!datos.id && cobrarAhora ? 'Guardar reserva y pago' : 'Guardar reserva'" type="submit" :loading="guardando" />
           </q-card-actions>
         </q-form>
       </q-card>
@@ -85,8 +109,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useQuasar, type QTableColumn } from 'quasar';
+import { uid, useQuasar, type QTableColumn } from 'quasar';
 import { api, colores, dinero, estados, horario, type Cancha, type Cliente, type Estado, type Reserva } from '@/services/api';
+import { estadoPago, metodos, nombreMetodo, saldoReserva, validarMonto, type Metodo } from '@/services/finanzas';
 
 type Formulario = { id: number; cliente_id: number | null; inicio: string; fin: string; tarifa?: number };
 const q = useQuasar();
@@ -106,17 +131,26 @@ const abierto = ref(false);
 const datos = ref<Formulario>({ id: 0, cliente_id: null, inicio: '', fin: '' });
 const registroNuevo = ref(false);
 const nuevoCliente = ref({ dni: '', nombre: '', telefono: '' });
+const cobrarAhora = ref(false);
+const modalidadPago = ref<'adelanto' | 'completo'>('adelanto');
+const pago = ref({ operacion: uid(), monto: '', metodo: 'efectivo' as Metodo, nota: '' });
 const tarifa = computed(() => datos.value.tarifa ?? cancha.value?.tarifa ?? 0);
 const importe = computed(() => {
   const minutos = (Date.parse(datos.value.fin + 'Z') - Date.parse(datos.value.inicio + 'Z')) / 60000;
   return minutos > 0 ? tarifa.value * minutos / 60 : null;
 });
 const opcionesEstado = Object.entries(estados).map(([value, label]) => ({ value, label }));
+watch([importe, modalidadPago], () => {
+  if (modalidadPago.value === 'completo') pago.value.monto = importe.value?.toFixed(2) ?? '';
+});
 const columnas: QTableColumn<Reserva>[] = [
   { name: 'cliente', label: 'Cliente', field: 'cliente', align: 'left', sortable: true },
   { name: 'inicio', label: 'Inicio', field: 'inicio', align: 'left', format: horario, sortable: true },
   { name: 'fin', label: 'Fin', field: 'fin', align: 'left', format: horario },
   { name: 'total', label: 'Total (S/)', field: 'total', align: 'right', format: dinero },
+  { name: 'abonado', label: 'Abonado', field: 'abonado', align: 'right', format: dinero },
+  { name: 'saldo', label: 'Saldo / por devolver', field: saldoReserva, align: 'right', format: dinero },
+  { name: 'pago', label: 'Pago y método', field: fila => estadoPago(fila).label, align: 'left' },
   { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
   { name: 'acciones', label: 'Acciones', field: 'id', align: 'right' },
 ];
@@ -153,6 +187,9 @@ async function editar(reserva?: Reserva) {
     datos.value = reserva ? { ...reserva } : { id: 0, cliente_id: null, inicio: '', fin: '' };
     registroNuevo.value = false;
     nuevoCliente.value = { dni: '', nombre: '', telefono: '' };
+    cobrarAhora.value = false;
+    modalidadPago.value = 'adelanto';
+    pago.value = { operacion: uid(), monto: '', metodo: 'efectivo', nota: '' };
     errorFormulario.value = '';
     abierto.value = true;
   } catch (problema) { error.value = (problema as Error).message; }
@@ -164,7 +201,8 @@ async function guardar() {
   const { id, cliente_id, inicio, fin } = datos.value;
   try {
     const cliente = registroNuevo.value ? { cliente_nuevo: nuevoCliente.value } : { cliente_id };
-    const reserva = await api<Reserva>(id ? '/reservas/' + id : '/reservas', id ? 'PUT' : 'POST', { inicio, fin, ...cliente });
+    const cobro = !id && cobrarAhora.value ? { pago_inicial: pago.value } : {};
+    const reserva = await api<Reserva>(id ? '/reservas/' + id : '/reservas', id ? 'PUT' : 'POST', { inicio, fin, ...cliente, ...cobro });
     abierto.value = false;
     q.notify({ type: 'positive', message: 'Reserva guardada · ' + dinero(reserva.total) });
     await cargar();

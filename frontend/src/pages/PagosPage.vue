@@ -14,6 +14,7 @@
           <small v-if="props.row.estado === 'cancelada' && Number(props.row.abonado) > 0" class="block">Por devolver</small>
         </q-td></template>
         <template #body-cell-estado="props"><q-td :props="props"><q-badge outline :color="colores[props.row.estado as Estado]" :label="estados[props.row.estado as Estado]" /></q-td></template>
+        <template #body-cell-cobro="props"><q-td :props="props"><q-badge outline :color="estadoPago(props.row).color" :label="estadoPago(props.row).label" /></q-td></template>
         <template #body-cell-acciones="props"><q-td :props="props"><q-btn flat dense no-caps color="primary" icon="payments" label="Gestionar" @click="abrir(props.row)" /></q-td></template>
       </q-table>
     </section>
@@ -33,8 +34,8 @@
           <q-card-section class="form-grid">
             <q-select v-model="form.tipo" outlined emit-value map-options label="Movimiento" :options="tipos" />
             <q-input v-model="form.monto" outlined type="number" min="0.01" max="99999999.99" step="0.01" prefix="S/" label="Importe" :rules="[validarMonto]" />
-            <q-select v-model="form.metodo" outlined :options="metodos" emit-value map-options label="Método" />
-            <q-input v-model="form.nota" outlined label="Nota (opcional)" maxlength="250" />
+            <q-select v-model="form.metodo" outlined :options="metodos" emit-value map-options label="Método de pago" />
+            <q-input v-model="form.nota" outlined :label="form.metodo === 'efectivo' ? 'Nota (opcional)' : 'Referencia o número de operación (opcional)'" maxlength="250" />
           </q-card-section>
           <q-card-actions align="right">
             <q-btn flat no-caps label="Cerrar" v-close-popup :disable="guardando" />
@@ -60,7 +61,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { uid, useQuasar, type QTableColumn } from 'quasar';
 import { api, colores, dinero, estados, horario, type Estado, type Reserva } from '@/services/api';
-import { metodos, nombreMetodo, validarMonto, type Metodo, type Pago } from '@/services/finanzas';
+import { estadoPago, metodos, nombreMetodo, saldoReserva as saldo, validarMonto, type Metodo, type Pago } from '@/services/finanzas';
 
 const q = useQuasar();
 const route = useRoute();
@@ -77,7 +78,6 @@ const cargandoPagos = ref(false);
 const guardando = ref(false);
 const abierto = ref(false);
 const form = ref({ operacion: uid(), tipo: 'cobro' as 'cobro' | 'devolucion', monto: '', metodo: 'efectivo' as Metodo, nota: '' });
-const saldo = (fila: Reserva) => fila.estado === 'cancelada' ? Number(fila.abonado) : Math.max(0, Number(fila.total) - Number(fila.abonado));
 const filas = computed(() => pendientes.value ? reservas.value.filter(item => saldo(item) > 0) : reservas.value);
 const tipos = computed(() => reserva.value?.estado === 'cancelada'
   ? [{ label: 'Devolución', value: 'devolucion' }]
@@ -88,6 +88,8 @@ const columnas: QTableColumn<Reserva>[] = [
   { name: 'inicio', label: 'Horario de inicio', field: 'inicio', format: horario, align: 'left', sortable: true },
   { name: 'total', label: 'Total', field: 'total', format: dinero, align: 'right' },
   { name: 'abonado', label: 'Abonado neto', field: 'abonado', format: dinero, align: 'right' },
+  { name: 'metodo_pago', label: 'Último método de pago', field: 'metodo_pago', format: valor => valor ? nombreMetodo(valor) : 'Sin pago', align: 'left' },
+  { name: 'cobro', label: 'Estado de pago', field: fila => estadoPago(fila).label, align: 'left' },
   { name: 'saldo', label: 'Saldo', field: saldo, format: dinero, align: 'right' },
   { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
   { name: 'acciones', label: 'Acciones', field: 'id', align: 'right' },
