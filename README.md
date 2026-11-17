@@ -10,6 +10,8 @@ En Nueva reserva puedes registrar el adelanto o el pago completo y seleccionar e
 
 Agenda y disponibilidad muestra los horarios ocupados y los intervalos libres, y permite preparar una nueva reserva. El Resumen incluye los cobros, gastos, neto del día y saldos por cobrar.
 
+Desde Reservas puedes abrir la constancia del alquiler e imprimirla o guardarla en PDF con el navegador. Clientes ofrece el historial de reservas y sus pagos. Reportes filtra las reservas por fecha de inicio y estado, muestra los saldos actuales y exporta los resultados a CSV.
+
 Para cargar datos ficticios de uso diario, ejecuta `php artisan canchas:demostracion` desde `backend`. Agrega ejemplos para hoy y los siguientes seis días, reutiliza los ya creados y evita horarios ocupados. Los cobros y gastos se identifican con DEMO y el historial usa el usuario Demostración.
 
 ## Instalación en Windows

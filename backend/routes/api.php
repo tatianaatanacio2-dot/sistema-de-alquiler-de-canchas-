@@ -19,9 +19,12 @@ Route::middleware(SesionAdministrador::class)->group(function () {
     Route::get('cancha', [AlquilerController::class, 'cancha']);
     Route::put('cancha', [AlquilerController::class, 'guardarCancha']);
     Route::get('clientes', [AlquilerController::class, 'clientes']);
+    Route::get('clientes/{id}/historial', [AlquilerController::class, 'historialCliente'])->whereNumber('id');
     Route::post('clientes', [AlquilerController::class, 'guardarCliente']);
     Route::put('clientes/{id}', [AlquilerController::class, 'guardarCliente'])->whereNumber('id');
     Route::get('reservas', [AlquilerController::class, 'reservas']);
+    Route::get('reservas/{id}', [AlquilerController::class, 'detalleReserva'])->whereNumber('id');
+    Route::get('reportes/reservas', [AlquilerController::class, 'reporteReservas']);
     Route::get('disponibilidad', [AlquilerController::class, 'disponibilidad']);
     Route::post('reservas', [AlquilerController::class, 'guardarReserva']);
     Route::put('reservas/{id}', [AlquilerController::class, 'guardarReserva'])->whereNumber('id');

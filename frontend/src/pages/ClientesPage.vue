@@ -15,7 +15,10 @@
       <q-table flat class="data-table" :rows="clientes" :columns="columnas" :filter="busqueda || ''" :loading="cargando"
         row-key="id" :pagination="{ rowsPerPage: 10 }" no-data-label="Aún no hay clientes para mostrar" no-results-label="No se encontraron coincidencias">
         <template #body-cell-acciones="props">
-          <q-td :props="props"><q-btn flat dense no-caps color="primary" icon="edit" label="Editar" @click="editar(props.row)" /></q-td>
+          <q-td :props="props">
+            <q-btn flat dense no-caps color="primary" icon="history" label="Historial" :to="'/clientes/' + props.row.id + '/historial'" />
+            <q-btn flat dense no-caps color="primary" icon="edit" label="Editar" @click="editar(props.row)" />
+          </q-td>
         </template>
       </q-table>
     </section>

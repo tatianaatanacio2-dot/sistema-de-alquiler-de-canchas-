@@ -46,6 +46,7 @@ const navegacion = [
   { ruta: '/pagos', nombre: 'Pagos', icono: 'payments' },
   { ruta: '/caja', nombre: 'Caja diaria', icono: 'account_balance_wallet' },
   { ruta: '/historial', nombre: 'Historial de cambios', icono: 'history' },
+  { ruta: '/reportes', nombre: 'Reportes', icono: 'assessment' },
 ];
 
 async function salir() {

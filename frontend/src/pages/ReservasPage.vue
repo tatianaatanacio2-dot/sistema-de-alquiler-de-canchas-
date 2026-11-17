@@ -30,6 +30,7 @@
         </q-td></template>
         <template #body-cell-acciones="props"><q-td :props="props">
           <q-btn flat dense no-caps color="primary" icon="payments" label="Pagos" :to="{ path: '/pagos', query: { reserva: String(props.row.id) } }" />
+          <q-btn flat dense no-caps color="primary" icon="print" label="Constancia" :to="'/reservas/' + props.row.id + '/constancia'" />
           <div v-if="props.row.estado === 'confirmada'" class="row no-wrap justify-end">
             <q-btn flat dense no-caps color="primary" icon="edit" label="Editar" @click="editar(props.row)" />
             <q-btn v-if="props.row.fin <= horaLocal()" flat dense no-caps color="green-9" label="Completar" @click="cambiarEstado(props.row, 'completada')" />

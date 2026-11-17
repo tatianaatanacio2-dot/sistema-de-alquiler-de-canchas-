@@ -235,4 +235,52 @@ class FinanzasTest extends TestCase
         })->where('a.estado', '<>', 'cancelada')->where('b.estado', '<>', 'cancelada')->count();
         $this->assertSame(0, $cruces);
     }
+
+    public function test_constancia_incluye_datos_y_pagos_de_la_reserva(): void
+    {
+        $this->postJson('/api/pagos', $this->cobro('20.00'))->assertOk();
+        $detalle = $this->getJson('/api/reservas/'.$this->reservaId)->assertOk()
+            ->assertJsonPath('reserva.id', $this->reservaId)->assertJsonPath('cliente', null)
+            ->assertJsonPath('cancha.nombre', 'Cancha sintética')->assertJsonCount(1, 'pagos');
+        $this->assertEquals(20, $detalle->json('reserva.abonado'));
+        $this->getJson('/api/reservas/999999')->assertNotFound();
+        $this->flushHeaders();
+        $this->getJson('/api/reservas/'.$this->reservaId)->assertUnauthorized();
+    }
+
+    public function test_historial_cliente_agrupa_solo_sus_reservas(): void
+    {
+        $ana = $this->postJson('/api/clientes', ['nombre' => 'Ana', 'dni' => '00123456'])->assertOk()->json('id');
+        $bea = $this->postJson('/api/clientes', ['nombre' => 'Bea'])->assertOk()->json('id');
+        $reserva = $this->postJson('/api/reservas', [
+            'cliente_id' => $ana, 'inicio' => '2026-11-13T10:00', 'fin' => '2026-11-13T11:00',
+        ])->assertOk()->json('id');
+        $this->postJson('/api/reservas', [
+            'cliente_id' => $bea, 'inicio' => '2026-11-13T11:00', 'fin' => '2026-11-13T12:00',
+        ])->assertOk();
+        $this->getJson('/api/clientes/'.$ana.'/historial')->assertOk()
+            ->assertJsonPath('cliente.dni', '00123456')->assertJsonCount(1, 'reservas')->assertJsonPath('reservas.0.id', $reserva);
+        $this->getJson('/api/clientes/999999/historial')->assertNotFound();
+    }
+
+    public function test_reporte_filtra_por_inicio_y_distingue_saldo_de_devolucion(): void
+    {
+        $this->postJson('/api/pagos', $this->cobro('20.00'))->assertOk();
+        $cancelada = $this->postJson('/api/reservas', [
+            'inicio' => '2026-11-13T10:00', 'fin' => '2026-11-13T11:00',
+            'pago_inicial' => ['operacion' => (string) Str::uuid(), 'monto' => '10.00', 'metodo' => 'plin'],
+        ])->assertOk()->json('id');
+        $this->patchJson('/api/reservas/'.$cancelada.'/estado', ['estado' => 'cancelada'])->assertOk();
+        $this->postJson('/api/reservas', ['inicio' => '2026-11-14T00:00', 'fin' => '2026-11-14T01:00'])->assertOk();
+        $this->getJson('/api/reportes/reservas?desde=2026-11-12&hasta=2026-11-13')->assertOk()
+            ->assertJsonCount(2, 'reservas')->assertJsonPath('totales.programado', '60.00')
+            ->assertJsonPath('totales.abonado', '30.00')->assertJsonPath('totales.pendiente', '40.00')
+            ->assertJsonPath('totales.porDevolver', '10.00');
+        $this->getJson('/api/reportes/reservas?desde=2026-11-12&hasta=2026-11-13&estado=confirmada')->assertOk()
+            ->assertJsonCount(1, 'reservas')->assertJsonPath('totales.porDevolver', '0.00');
+        $this->getJson('/api/reportes/reservas?desde=2026-11-13&hasta=2026-11-12')->assertStatus(422);
+        $this->getJson('/api/reportes/reservas?desde=2024-01-01&hasta=2026-11-12')->assertStatus(422);
+        $this->flushHeaders();
+        $this->getJson('/api/reportes/reservas?desde=2026-11-12&hasta=2026-11-13')->assertUnauthorized();
+    }
 }

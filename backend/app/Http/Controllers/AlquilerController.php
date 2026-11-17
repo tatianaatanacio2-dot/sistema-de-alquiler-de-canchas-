@@ -217,6 +217,71 @@ class AlquilerController
         return response()->json($this->agenda()->where('r.id', $id)->first());
     }
 
+    public function detalleReserva(int $id): JsonResponse
+    {
+        return DB::transaction(function () use ($id) {
+            $reserva = $this->agenda()->where('r.id', $id)->first();
+            abort_unless($reserva, 404, 'La reserva no existe.');
+
+            return response()->json([
+                'reserva' => $reserva,
+                'cancha' => DB::table('canchas')->find(1),
+                'cliente' => $reserva->cliente_id ? DB::table('clientes')->find($reserva->cliente_id) : null,
+                'pagos' => DB::table('pagos')->where('reserva_id', $id)->orderBy('id')->get(),
+                'emitido' => now()->format(self::HORARIO),
+            ]);
+        });
+    }
+
+    public function historialCliente(int $id): JsonResponse
+    {
+        return DB::transaction(function () use ($id) {
+            $cliente = DB::table('clientes')->find($id);
+            abort_unless($cliente, 404, 'El cliente no existe.');
+
+            return response()->json([
+                'cliente' => $cliente,
+                'reservas' => $this->agenda()->where('r.cliente_id', $id)->orderByDesc('r.inicio')->get(),
+            ]);
+        });
+    }
+
+    public function reporteReservas(Request $request): JsonResponse
+    {
+        $filtros = $request->validate([
+            'desde' => ['required', 'date_format:Y-m-d'],
+            'hasta' => ['required', 'date_format:Y-m-d', 'after_or_equal:desde'],
+            'estado' => ['nullable', Rule::in(self::ESTADOS)],
+        ]);
+        $desde = CarbonImmutable::parse($filtros['desde']);
+        $hasta = CarbonImmutable::parse($filtros['hasta'])->addDay();
+        abort_if($desde->diffInDays($hasta) > 366, 422, 'Selecciona un período de hasta 366 días.');
+        $consulta = $this->agenda()->where('r.inicio', '>=', $desde->format(self::HORARIO))
+            ->where('r.inicio', '<', $hasta->format(self::HORARIO));
+        if ($estado = $filtros['estado'] ?? null) {
+            $consulta->where('r.estado', $estado);
+        }
+        $reservas = $consulta->orderBy('r.inicio')->orderBy('r.id')->get();
+        $totales = ['programado' => 0, 'abonado' => 0, 'pendiente' => 0, 'porDevolver' => 0];
+        foreach ($reservas as $reserva) {
+            $total = FinanzasController::centimos((string) $reserva->total);
+            $abonado = FinanzasController::centimos((string) $reserva->abonado);
+            $totales['abonado'] += $abonado;
+            if ($reserva->estado === 'cancelada') {
+                $totales['porDevolver'] += $abonado;
+            } else {
+                $totales['programado'] += $total;
+                $totales['pendiente'] += max(0, $total - $abonado);
+            }
+        }
+
+        return response()->json([
+            'desde' => $filtros['desde'], 'hasta' => $filtros['hasta'],
+            'estado' => $estado, 'reservas' => $reservas,
+            'totales' => array_map(FinanzasController::soles(...), $totales),
+        ]);
+    }
+
     public function cerrarReserva(Request $request, int $id): JsonResponse
     {
         $estado = $request->validate(['estado' => ['required', Rule::in(['cancelada', 'completada'])]])['estado'];
