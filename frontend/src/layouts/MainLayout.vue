@@ -41,6 +41,7 @@ const navegacion = [
   { ruta: '/', nombre: 'Resumen general', icono: 'space_dashboard' },
   { ruta: '/cancha', nombre: 'Mi cancha', icono: 'sports_soccer' },
   { ruta: '/clientes', nombre: 'Clientes', icono: 'people_outline' },
+  { ruta: '/lista-espera', nombre: 'Lista de espera', icono: 'hourglass_top' },
   { ruta: '/reservas', nombre: 'Reservas', icono: 'calendar_month' },
   { ruta: '/agenda', nombre: 'Agenda y disponibilidad', icono: 'event_available' },
   { ruta: '/pagos', nombre: 'Pagos', icono: 'payments' },

@@ -108,6 +108,72 @@ class AlquilerController
         return response()->json(DB::table('clientes')->orderBy('nombre')->get());
     }
 
+    public function historialCliente(int $id): JsonResponse
+    {
+        $cliente = DB::table('clientes')->find($id);
+        abort_unless($cliente, 404, 'El cliente no existe.');
+        $reservas = $this->agenda()->where('r.cliente_id', $id)
+            ->orderByDesc('r.inicio')->orderByDesc('r.id')->get();
+
+        return response()->json([
+            'cliente' => $cliente,
+            'reservas' => $reservas,
+            'totalReservas' => $reservas->count(),
+            'completadas' => $reservas->where('estado', 'completada')->count(),
+            'canceladas' => $reservas->where('estado', 'cancelada')->count(),
+        ]);
+    }
+
+    public function listaEspera(): JsonResponse
+    {
+        return response()->json(DB::table('lista_espera as l')->leftJoin('clientes as c', 'c.id', '=', 'l.cliente_id')
+            ->select('l.*')
+            ->selectRaw("COALESCE(NULLIF(c.nombre, ''), NULLIF(c.dni, ''), NULLIF(c.telefono, ''), CONCAT('Cliente #', c.id), 'Sin cliente') AS cliente")
+            ->orderByRaw("FIELD(l.estado, 'disponible', 'pendiente', 'avisado', 'atendida', 'cancelada')")
+            ->orderBy('l.inicio')->orderBy('l.id')->get());
+    }
+
+    public function guardarEnEspera(Request $request): JsonResponse
+    {
+        $datos = $request->validate([
+            'cliente_id' => ['nullable', 'integer', 'exists:clientes,id', 'prohibits:cliente_nuevo'],
+            'cliente_nuevo' => ['nullable', 'array:dni,nombre,telefono,correo'],
+            'inicio' => ['required', 'date_format:'.self::HORARIO],
+            'fin' => ['required', 'date_format:'.self::HORARIO, 'after:inicio'],
+        ]);
+        $nuevoCliente = array_map(fn ($valor) => $valor ?? '',
+            Validator::make($datos['cliente_nuevo'] ?? [], self::CAMPOS_CLIENTE)->validate());
+        unset($datos['cliente_nuevo']);
+        if (empty($datos['cliente_id']) && ! array_filter($nuevoCliente, fn ($valor) => $valor !== '')) {
+            throw ValidationException::withMessages(['cliente_id' => 'Selecciona un cliente o ingresa los datos de uno nuevo.']);
+        }
+        if ($datos['inicio'] < now()->format(self::HORARIO)) {
+            throw ValidationException::withMessages(['inicio' => 'El horario solicitado debe comenzar a partir de ahora.']);
+        }
+
+        $datos['cliente_id'] = array_filter($nuevoCliente, fn ($valor) => $valor !== '')
+            ? $this->insertarCliente($nuevoCliente)
+            : $datos['cliente_id'];
+        $id = DB::table('lista_espera')->insertGetId($datos + ['estado' => 'pendiente']);
+
+        return response()->json(DB::table('lista_espera as l')->leftJoin('clientes as c', 'c.id', '=', 'l.cliente_id')
+            ->select('l.*')->selectRaw("COALESCE(NULLIF(c.nombre, ''), NULLIF(c.dni, ''), NULLIF(c.telefono, ''), CONCAT('Cliente #', c.id), 'Sin cliente') AS cliente")
+            ->where('l.id', $id)->first(), 201);
+    }
+
+    public function cambiarEstadoEspera(Request $request, int $id): JsonResponse
+    {
+        $estado = $request->validate(['estado' => ['required', Rule::in(['avisado', 'atendida', 'cancelada'])]])['estado'];
+        $solicitud = DB::table('lista_espera')->find($id);
+        abort_unless($solicitud, 404, 'La solicitud de espera no existe.');
+        abort_if(in_array($solicitud->estado, ['atendida', 'cancelada'], true), 409, 'La solicitud ya está cerrada.');
+        DB::table('lista_espera')->where('id', $id)->update(['estado' => $estado]);
+
+        return response()->json(DB::table('lista_espera as l')->leftJoin('clientes as c', 'c.id', '=', 'l.cliente_id')
+            ->select('l.*')->selectRaw("COALESCE(NULLIF(c.nombre, ''), NULLIF(c.dni, ''), NULLIF(c.telefono, ''), CONCAT('Cliente #', c.id), 'Sin cliente') AS cliente")
+            ->where('l.id', $id)->first());
+    }
+
     public function guardarCliente(Request $request, ?int $id = null): JsonResponse
     {
         $datos = array_map(fn ($valor) => $valor ?? '', $request->validate(self::CAMPOS_CLIENTE));
@@ -146,6 +212,100 @@ class AlquilerController
         return response()->json($reservas->orderByDesc('r.inicio')->orderByDesc('r.id')->get());
     }
 
+    public function guardarReservasRepetidas(Request $request): JsonResponse
+    {
+        $datos = $request->validate([
+            'cliente_id' => ['nullable', 'integer', 'exists:clientes,id', 'prohibits:cliente_nuevo'],
+            'cliente_nuevo' => ['nullable', 'array:dni,nombre,telefono'],
+            'inicio' => ['required', 'date_format:'.self::HORARIO],
+            'fin' => ['required', 'date_format:'.self::HORARIO, 'after:inicio'],
+            'cantidad' => ['required', 'integer', 'min:2', 'max:52'],
+            'pago_inicial' => ['nullable', 'array:operacion,monto,metodo,nota'],
+        ]);
+        $cantidad = (int) $datos['cantidad'];
+        unset($datos['cantidad']);
+        $nuevoCliente = array_map(fn ($valor) => $valor ?? '',
+            Validator::make($datos['cliente_nuevo'] ?? [], self::CAMPOS_CLIENTE)->validate());
+        $pagoInicial = $datos['pago_inicial'] ?? null;
+        if ($pagoInicial !== null) {
+            $pagoInicial = Validator::make($pagoInicial, [
+                'operacion' => ['required', 'uuid'],
+                'monto' => ['required', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
+                'metodo' => ['required', Rule::in(FinanzasController::METODOS)],
+                'nota' => ['nullable', 'string', 'max:250'],
+            ])->validate();
+        }
+        unset($datos['cliente_nuevo'], $datos['pago_inicial']);
+
+        $ids = DB::transaction(function () use ($datos, $nuevoCliente, $pagoInicial, $cantidad) {
+            $cancha = DB::table('canchas')->where('id', 1)->lockForUpdate()->first();
+            abort_unless($cancha && $cancha->activa && $cancha->tarifa, 409, 'Activa la cancha y configura su tarifa.');
+            if ($datos['inicio'] < now()->format(self::HORARIO)) {
+                throw ValidationException::withMessages(['inicio' => 'La primera fecha debe comenzar a partir de ahora.']);
+            }
+
+            $inicioBase = CarbonImmutable::parse($datos['inicio']);
+            $finBase = CarbonImmutable::parse($datos['fin']);
+            $duracion = $finBase->getTimestamp() - $inicioBase->getTimestamp();
+            $ocurrencias = [];
+            for ($i = 0; $i < $cantidad; $i++) {
+                $inicio = $inicioBase->addWeeks($i)->format(self::HORARIO);
+                $fin = $finBase->addWeeks($i)->format(self::HORARIO);
+                $cruce = DB::table('reservas')->where('cancha_id', 1)->where('estado', '<>', 'cancelada')
+                    ->where('inicio', '<', $fin)->where('fin', '>', $inicio)->exists();
+                if ($cruce) {
+                    throw ValidationException::withMessages(['cantidad' => 'Hay un cruce con una reserva existente el '.substr($inicio, 0, 10).'. No se guardó ninguna fecha.']);
+                }
+                foreach ($ocurrencias as $anterior) {
+                    if ($inicio < $anterior['fin'] && $fin > $anterior['inicio']) {
+                        throw ValidationException::withMessages(['cantidad' => 'Las fechas repetidas se cruzan entre sí. No se guardó ninguna fecha.']);
+                    }
+                }
+                $ocurrencias[] = ['inicio' => $inicio, 'fin' => $fin];
+            }
+
+            $clienteId = array_filter($nuevoCliente, fn ($valor) => $valor !== '')
+                ? $this->insertarCliente($nuevoCliente)
+                : ($datos['cliente_id'] ?? null);
+            $minutos = intdiv($duracion, 60);
+            $centimosPorHora = (int) $cancha->tarifa * 100;
+            $centimos = intdiv($minutos, 60) * $centimosPorHora + intdiv(($minutos % 60) * $centimosPorHora + 30, 60);
+            $idsCreados = [];
+
+            foreach ($ocurrencias as $ocurrencia) {
+                $id = DB::table('reservas')->insertGetId([
+                    'cancha_id' => 1,
+                    'cliente_id' => $clienteId,
+                    'inicio' => $ocurrencia['inicio'],
+                    'fin' => $ocurrencia['fin'],
+                    'tarifa' => $cancha->tarifa,
+                    'total' => sprintf('%d.%02d', intdiv($centimos, 100), $centimos % 100),
+                ]);
+                $idsCreados[] = $id;
+                Historial::registrar('reservas', $id, 'Crear reserva');
+
+                if ($pagoInicial !== null) {
+                    $montoCentavos = FinanzasController::centimos((string) $pagoInicial['monto']);
+                    abort_if($montoCentavos <= 0 || $montoCentavos > $centimos, 422, 'El pago debe ser mayor a cero y no superar el total por fecha.');
+                    $pagoId = DB::table('pagos')->insertGetId([
+                        'operacion' => (string) \Illuminate\Support\Str::uuid(),
+                        'reserva_id' => $id,
+                        'tipo' => 'cobro',
+                        'monto' => FinanzasController::soles($montoCentavos),
+                        'metodo' => $pagoInicial['metodo'],
+                        'nota' => $pagoInicial['nota'] ?? '',
+                        'fecha' => now()->format('Y-m-d H:i:s'),
+                    ]);
+                    Historial::registrar('pagos', $pagoId, 'Registrar cobro');
+                }
+            }
+
+            return $idsCreados;
+        }, 3);
+
+        return response()->json($this->agenda()->whereIn('r.id', $ids)->orderBy('r.inicio')->get(), 201);
+    }
+
     public function guardarReserva(Request $request, ?int $id = null): JsonResponse
     {
         $datos = $request->validate([
@@ -167,7 +327,7 @@ class AlquilerController
         $id = DB::transaction(function () use ($datos, $nuevoCliente, $pagoInicial, $id) {
             $cancha = DB::table('canchas')->where('id', 1)->lockForUpdate()->first();
             abort_unless($cancha, 409, 'La cancha necesita configuración.');
-            $anterior = $id === null ? null : DB::table('reservas')->find($id);
+            $anterior = $id === null ? null : DB::table('reservas')->where('id', $id)->lockForUpdate()->first();
             abort_if($id !== null && ! $anterior, 404, 'La reserva no existe.');
             abort_if($anterior && $anterior->estado !== 'confirmada', 409, 'Solo se pueden editar reservas confirmadas.');
             $mismoHorario = $anterior && $anterior->inicio === $datos['inicio'] && $anterior->fin === $datos['fin'];
@@ -233,19 +393,6 @@ class AlquilerController
         });
     }
 
-    public function historialCliente(int $id): JsonResponse
-    {
-        return DB::transaction(function () use ($id) {
-            $cliente = DB::table('clientes')->find($id);
-            abort_unless($cliente, 404, 'El cliente no existe.');
-
-            return response()->json([
-                'cliente' => $cliente,
-                'reservas' => $this->agenda()->where('r.cliente_id', $id)->orderByDesc('r.inicio')->get(),
-            ]);
-        });
-    }
-
     public function reporteReservas(Request $request): JsonResponse
     {
         $filtros = $request->validate([
@@ -296,6 +443,12 @@ class AlquilerController
             abort_if($estado === 'completada' && $reserva->fin > now()->format(self::HORARIO), 409, 'Podrás completarla cuando termine su horario.');
             DB::table('reservas')->where('id', $id)->update(['estado' => $estado]);
             Historial::registrar('reservas', $id, $estado === 'cancelada' ? 'Cancelar reserva' : 'Completar reserva', $reserva);
+            if ($estado === 'cancelada') {
+                DB::table('lista_espera')->where('estado', 'pendiente')
+                    ->where('inicio', '>=', $reserva->inicio)->where('fin', '<=', $reserva->fin)
+                    ->where('inicio', '>', now()->format(self::HORARIO))
+                    ->update(['estado' => 'disponible']);
+            }
         }, 3);
 
         return response()->json($this->agenda()->where('r.id', $id)->first());
@@ -303,12 +456,16 @@ class AlquilerController
 
     private function agenda(): Builder
     {
+        $resumenPagos = DB::table('pagos')->select('reserva_id')->selectRaw('SUM(monto) AS pagado')->groupBy('reserva_id');
+
         return DB::table('reservas as r')->leftJoin('clientes as c', 'c.id', '=', 'r.cliente_id')
+            ->leftJoinSub($resumenPagos, 'p', 'p.reserva_id', '=', 'r.id')
             ->select('r.*')
             ->selectSub(DB::table('pagos')->whereColumn('reserva_id', 'r.id')
                 ->selectRaw("COALESCE(SUM(CASE WHEN tipo = 'cobro' THEN monto ELSE -monto END), 0)"), 'abonado')
             ->selectSub(DB::table('pagos')->whereColumn('reserva_id', 'r.id')->where('tipo', 'cobro')
                 ->orderByDesc('id')->limit(1)->select('metodo'), 'metodo_pago')
+            ->addSelect('c.telefono as cliente_telefono')
             ->selectRaw("COALESCE(NULLIF(c.nombre, ''), NULLIF(c.dni, ''), NULLIF(c.telefono, ''), CASE WHEN c.id IS NULL THEN 'Sin cliente' ELSE CONCAT('Cliente #', c.id) END) AS cliente");
     }
 

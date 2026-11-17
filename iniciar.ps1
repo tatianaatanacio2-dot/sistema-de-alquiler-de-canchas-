@@ -19,6 +19,11 @@ if (!(Test-Path -LiteralPath (Join-Path $backend 'public/index.html'))) {
     throw 'Compila la interfaz con compilar.ps1.'
 }
 
+& $Php (Join-Path $backend 'artisan') migrate --force --no-interaction
+if ($LASTEXITCODE -ne 0) {
+    throw 'No se pudo actualizar el esquema de la base de datos.'
+}
+
 $direccion = if ($RedLocal) { '0.0.0.0' } else { '127.0.0.1' }
 Write-Host 'Alquiler de cancha: http://127.0.0.1:8012/'
 if ($RedLocal) {

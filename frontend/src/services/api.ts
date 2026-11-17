@@ -5,8 +5,14 @@ export type Cancha = { id: number; nombre: string; tarifa: number | null; activa
 export type Cliente = { id: number; dni: string; nombre: string; telefono: string; correo: string };
 export type Estado = 'confirmada' | 'cancelada' | 'completada';
 export type Reserva = {
-  id: number; cliente_id: number | null; cliente: string; inicio: string; fin: string;
-  tarifa: number; total: string; estado: Estado; abonado: string; metodo_pago: string | null;
+  id: number; cliente_id: number | null; cliente: string; cliente_telefono?: string | null; inicio: string; fin: string;
+  tarifa: number; total: string; estado: Estado; abonado: number | string; metodo_pago: string | null;
+  pagado?: number | string; saldo?: number | string;
+};
+export type Pago = { id: number; reserva_id: number; monto: string; metodo: string; referencia: string | null; registrado_en: string };
+export type EntradaEspera = {
+  id: number; cliente_id: number; cliente: string; inicio: string; fin: string;
+  estado: 'pendiente' | 'disponible' | 'avisado' | 'atendida' | 'cancelada';
 };
 export type Acceso = { requiereCuenta: boolean; equipoLocal: boolean };
 type Credenciales = { token: string; usuario: Usuario };
