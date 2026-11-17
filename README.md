@@ -1,6 +1,6 @@
 # Sistema de alquiler de cancha
 
-Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reservas con horarios sin cruces e historial de cancelaciones. La tarifa inicial es S/ 30 por hora y la agenda usa la hora de Bogotá.
+Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reservas con horarios sin cruces, historial de clientes, lista de espera y pagos parciales con saldo pendiente. La tarifa inicial es S/ 30 por hora y la agenda usa la hora de Bogotá.
 
 ## Instalación en Windows
 

@@ -20,8 +20,15 @@ Route::middleware(SesionAdministrador::class)->group(function () {
     Route::get('clientes', [AlquilerController::class, 'clientes']);
     Route::post('clientes', [AlquilerController::class, 'guardarCliente']);
     Route::put('clientes/{id}', [AlquilerController::class, 'guardarCliente'])->whereNumber('id');
+    Route::get('clientes/{id}/historial', [AlquilerController::class, 'historialCliente'])->whereNumber('id');
+    Route::get('lista-espera', [AlquilerController::class, 'listaEspera']);
+    Route::post('lista-espera', [AlquilerController::class, 'guardarEnEspera']);
+    Route::patch('lista-espera/{id}/estado', [AlquilerController::class, 'cambiarEstadoEspera'])->whereNumber('id');
     Route::get('reservas', [AlquilerController::class, 'reservas']);
     Route::post('reservas', [AlquilerController::class, 'guardarReserva']);
+    Route::post('reservas/repetir', [AlquilerController::class, 'guardarReservasRepetidas']);
     Route::put('reservas/{id}', [AlquilerController::class, 'guardarReserva'])->whereNumber('id');
+    Route::get('reservas/{id}/pagos', [AlquilerController::class, 'movimientosPago'])->whereNumber('id');
+    Route::post('reservas/{id}/pagos', [AlquilerController::class, 'registrarPago'])->whereNumber('id');
     Route::patch('reservas/{id}/estado', [AlquilerController::class, 'cerrarReserva'])->whereNumber('id');
 });

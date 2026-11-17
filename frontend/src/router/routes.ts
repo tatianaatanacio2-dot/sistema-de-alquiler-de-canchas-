@@ -9,6 +9,7 @@ const routes: RouteRecordRaw[] = [
       { path: '', component: () => import('@/pages/IndexPage.vue'), meta: { title: 'Resumen general' } },
       { path: 'cancha', component: () => import('@/pages/CanchaPage.vue'), meta: { title: 'Mi cancha' } },
       { path: 'clientes', component: () => import('@/pages/ClientesPage.vue'), meta: { title: 'Clientes' } },
+      { path: 'lista-espera', component: () => import('@/pages/ListaEsperaPage.vue'), meta: { title: 'Lista de espera' } },
       { path: 'reservas', component: () => import('@/pages/ReservasPage.vue'), meta: { title: 'Reservas' } },
     ],
   },
