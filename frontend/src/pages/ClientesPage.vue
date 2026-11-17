@@ -1,7 +1,7 @@
 <template>
   <q-page class="workspace">
     <div class="page-heading">
-      <div><span class="eyebrow">GESTIÓN DE ALQUILERES</span><h1>Clientes</h1><p>Registra los datos de quienes reservan la cancha.</p></div>
+      <div><h1>Clientes</h1><p>Registra los datos de quienes reservan la cancha.</p></div>
       <q-btn color="primary" unelevated no-caps icon="add" label="Nuevo cliente" @click="editar()" />
     </div>
     <q-banner v-if="error" rounded class="bg-red-1 text-red-9 q-mb-md" role="alert">{{ error }}</q-banner>
@@ -10,16 +10,33 @@
         <q-input v-model="busqueda" class="table-search" outlined dense clearable placeholder="Buscar clientes…" aria-label="Buscar clientes">
           <template #prepend><q-icon name="search" /></template>
         </q-input>
-        <q-btn flat round dense icon="refresh" aria-label="Actualizar clientes" @click="cargar" />
+        <q-btn flat round icon="refresh" aria-label="Actualizar clientes" @click="cargar" />
       </div>
-      <q-table flat class="data-table" :rows="clientes" :columns="columnas" :filter="busqueda || ''" :loading="cargando"
+      <q-table flat class="data-table" :grid="q.screen.lt.md" :rows="clientes" :columns="columnas" :filter="busqueda || ''" :loading="cargando"
         row-key="id" :pagination="{ rowsPerPage: 10 }" no-data-label="Aún no hay clientes para mostrar" no-results-label="No se encontraron coincidencias">
+        <template #item="{ row }">
+          <div class="col-12 col-sm-6 record-item">
+            <q-card flat bordered class="record-card">
+              <q-card-section>
+                <div class="record-heading"><h3>{{ row.nombre || 'Cliente sin nombre' }}</h3></div>
+                <dl v-if="row.dni || row.telefono || row.correo" class="record-details">
+                  <div v-if="row.dni"><dt>DNI</dt><dd>{{ row.dni }}</dd></div>
+                  <div v-if="row.telefono"><dt>Teléfono</dt><dd>{{ row.telefono }}</dd></div>
+                  <div v-if="row.correo"><dt>Correo</dt><dd>{{ row.correo }}</dd></div>
+                </dl>
+              </q-card-section>
+              <q-card-actions class="record-actions">
+                <q-btn flat no-caps color="primary" icon="edit" label="Editar" @click="editar(row)" />
+              </q-card-actions>
+            </q-card>
+          </div>
+        </template>
         <template #body-cell-acciones="props">
           <q-td :props="props"><q-btn flat dense no-caps color="primary" icon="edit" label="Editar" @click="editar(props.row)" /></q-td>
         </template>
       </q-table>
     </section>
-    <q-dialog v-model="abierto" :persistent="guardando">
+    <q-dialog v-model="abierto" :persistent="guardando" :maximized="q.screen.lt.sm">
       <q-card class="dialog-card">
         <q-card-section><h2>{{ datos.id ? 'Editar cliente' : 'Nuevo cliente' }}</h2></q-card-section>
         <q-separator />

@@ -15,13 +15,13 @@ class AccesoController
     {
         return response()->json([
             'requiereCuenta' => ! DB::table('administrador')->where('id', 1)->exists(),
-            'equipoLocal' => in_array($request->ip(), ['127.0.0.1', '::1'], true),
+            'equipoLocal' => $this->permiteConfigurar($request),
         ])->header('Cache-Control', 'no-store');
     }
 
     public function configurar(Request $request): JsonResponse
     {
-        abort_unless($request->isJson() && in_array($request->ip(), ['127.0.0.1', '::1'], true), 403,
+        abort_unless($request->isJson() && $this->permiteConfigurar($request), 403,
             'Crea la primera cuenta desde el navegador de la computadora que aloja el sistema.');
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:80'],
@@ -67,6 +67,11 @@ class AccesoController
         Cache::forget(SesionAdministrador::clave((string) $request->bearerToken()));
 
         return response()->json(['mensaje' => 'Sesión cerrada.']);
+    }
+
+    private function permiteConfigurar(Request $request): bool
+    {
+        return app()->environment('local') && in_array($request->ip(), ['127.0.0.1', '::1'], true);
     }
 
     private function emitirSesion(object $admin): JsonResponse

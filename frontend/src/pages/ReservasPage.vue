@@ -1,23 +1,45 @@
 <template>
   <q-page class="workspace">
     <div class="page-heading">
-      <div><span class="eyebrow">GESTIÓN DE ALQUILERES</span><h1>Reservas</h1><p>Consulta la agenda y el historial de la cancha.</p></div>
+      <div><h1>Reservas</h1><p>Consulta la agenda y el historial de la cancha.</p></div>
       <q-btn color="primary" unelevated no-caps icon="add" label="Nueva reserva" @click="editar()" />
     </div>
     <q-banner v-if="error" rounded class="bg-red-1 text-red-9 q-mb-md" role="alert">{{ error }}</q-banner>
     <section class="panel">
-      <div class="table-toolbar">
+      <div class="table-toolbar reservation-toolbar">
         <q-input v-model="busqueda" class="table-search" outlined dense clearable placeholder="Buscar por cliente…" aria-label="Buscar por cliente">
           <template #prepend><q-icon name="search" /></template>
         </q-input>
-        <div class="row items-center q-gutter-sm">
+        <div class="reservation-filters">
           <q-input v-model="fecha" type="date" stack-label outlined dense clearable label="Fecha" />
-          <q-select v-model="estado" :options="opcionesEstado" emit-value map-options clearable outlined dense label="Estado" style="min-width: 145px" />
-          <q-btn flat round dense icon="refresh" aria-label="Actualizar reservas" @click="cargar" />
+          <q-select v-model="estado" :options="opcionesEstado" emit-value map-options clearable outlined dense label="Estado" />
+          <q-btn flat round icon="refresh" aria-label="Actualizar reservas" @click="cargar" />
         </div>
       </div>
-      <q-table flat class="data-table" :rows="reservas" :columns="columnas" :filter="busqueda || ''" :loading="cargando"
+      <q-table flat class="data-table" :grid="q.screen.width < 1250" :rows="reservas" :columns="columnas" :filter="busqueda || ''" :filter-method="filtrarPorCliente" :loading="cargando"
         row-key="id" :pagination="{ rowsPerPage: 10 }" no-data-label="Aún no hay reservas para mostrar" no-results-label="No se encontraron coincidencias">
+        <template #item="{ row }">
+          <div class="col-12 col-sm-6 record-item">
+            <q-card flat bordered class="record-card">
+              <q-card-section>
+                <div class="record-heading">
+                  <h3>{{ row.cliente }}</h3>
+                  <q-badge outline :color="colores[row.estado as Estado]" :label="estados[row.estado as Estado]" />
+                </div>
+                <dl class="record-details">
+                  <div><dt>Inicio</dt><dd>{{ horario(row.inicio) }}</dd></div>
+                  <div><dt>Fin</dt><dd>{{ horario(row.fin) }}</dd></div>
+                  <div><dt>Total</dt><dd class="text-weight-bold">{{ dinero(row.total) }}</dd></div>
+                </dl>
+              </q-card-section>
+              <q-card-actions v-if="row.estado === 'confirmada'" class="record-actions">
+                <q-btn flat no-caps color="primary" icon="edit" label="Editar" @click="editar(row)" />
+                <q-btn v-if="row.fin <= horaLocal()" flat no-caps color="green-9" label="Completar" @click="cambiarEstado(row, 'completada')" />
+                <q-btn flat no-caps color="red-8" label="Cancelar" @click="cambiarEstado(row, 'cancelada')" />
+              </q-card-actions>
+            </q-card>
+          </div>
+        </template>
         <template #body-cell-estado="props"><q-td :props="props">
           <q-badge outline :color="colores[props.row.estado as Estado]" :label="estados[props.row.estado as Estado]" />
         </q-td></template>
@@ -31,7 +53,7 @@
         </q-td></template>
       </q-table>
     </section>
-    <q-dialog v-model="abierto" :persistent="guardando">
+    <q-dialog v-model="abierto" :persistent="guardando" :maximized="q.screen.lt.sm">
       <q-card class="dialog-card">
         <q-card-section><h2>{{ datos.id ? 'Editar reserva' : 'Nueva reserva' }}</h2><div class="text-caption text-grey-7">{{ cancha?.nombre }}</div></q-card-section>
         <q-separator />
@@ -69,6 +91,10 @@
             <div class="full-field row justify-between items-center q-gutter-sm">
               <span class="text-caption text-grey-7">Hora de Bogotá · {{ dinero(tarifa) }} por hora</span>
               <strong v-if="importe !== null">Total estimado {{ dinero(importe) }}</strong>
+            </div>
+            <div v-if="datos.inicio" class="full-field row q-gutter-xs">
+              <q-btn v-for="minutos in [30, 60, 90]" :key="minutos" outline no-caps color="primary"
+                :label="`${minutos} min`" @click="fijarDuracion(minutos)" />
             </div>
           </q-card-section>
           <q-card-actions align="right">
@@ -123,6 +149,23 @@ const reloj = new Intl.DateTimeFormat('sv-SE', {
   timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
 });
 const horaLocal = () => reloj.format(new Date()).replace(' ', 'T');
+const comparar = new Intl.Collator('es', { sensitivity: 'base', usage: 'search' });
+function filtrarPorCliente(filas: readonly Reserva[], termino: string) {
+  const consulta = termino.trim().normalize('NFC');
+  if (!consulta) return filas.slice();
+  return filas.filter(({ cliente }) => {
+    const nombre = cliente.normalize('NFC');
+    for (let i = 0; i <= nombre.length - consulta.length; i++) {
+      if (comparar.compare(nombre.slice(i, i + consulta.length), consulta) === 0) return true;
+    }
+    return false;
+  });
+}
+
+function fijarDuracion(minutos: number) {
+  const inicio = Date.parse(datos.value.inicio + 'Z');
+  if (Number.isFinite(inicio)) datos.value.fin = new Date(inicio + minutos * 60000).toISOString().slice(0, 16);
+}
 const etiquetaCliente = (cliente?: Cliente) => cliente
   ? cliente.nombre || cliente.dni || cliente.telefono || 'Cliente #' + cliente.id
   : '';

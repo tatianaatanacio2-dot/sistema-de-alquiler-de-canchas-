@@ -22,11 +22,15 @@ if (!(Test-Path -LiteralPath (Join-Path $backend 'public/index.html'))) {
 $direccion = if ($RedLocal) { '0.0.0.0' } else { '127.0.0.1' }
 Write-Host 'Alquiler de cancha: http://127.0.0.1:8012/'
 if ($RedLocal) {
-    $redes = Get-NetIPConfiguration | Where-Object IPv4DefaultGateway
-    foreach ($red in $redes) {
-        foreach ($ip in $red.IPv4Address) {
-            Write-Host ('Servidor para el APK: http://{0}:8012' -f $ip.IPAddress)
-        }
+    $ipsPrivadas = @(Get-NetIPConfiguration |
+        ForEach-Object { $_.IPv4Address } |
+        Where-Object IPAddress -Match '^(?:10\.\d+|192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d+\.\d+$' |
+        Select-Object -ExpandProperty IPAddress -Unique)
+    foreach ($ip in $ipsPrivadas) {
+        Write-Host ('Servidor para el APK: http://{0}:8012' -f $ip)
+    }
+    if (!$ipsPrivadas) {
+        Write-Warning 'No se encontro una direccion IPv4 privada para el APK.'
     }
 }
 Push-Location -LiteralPath $backend
