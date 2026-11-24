@@ -21,6 +21,8 @@ export type Cliente = {
 };
 export type Estado = "confirmada" | "cancelada" | "completada";
 export type Reserva = {
+  cancha_id: number;
+  cancha_nombre: string;
   id: number;
   cliente_id: number | null;
   cliente: string;

@@ -77,6 +77,7 @@ class PortalController
     public function reservar(Request $request, AlquilerController $alquiler): JsonResponse
     {
         $datos = $request->validate([
+            'cancha_id' => ['nullable', 'integer', 'exists:canchas,id'],
             'inicio' => ['required', 'date_format:Y-m-d\TH:i'],
             'fin' => ['required', 'date_format:Y-m-d\TH:i'],
             'cliente_id' => ['prohibited'], 'cliente_nuevo' => ['prohibited'],

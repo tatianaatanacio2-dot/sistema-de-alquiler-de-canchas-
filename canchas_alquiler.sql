@@ -8,14 +8,14 @@ CREATE TABLE IF NOT EXISTS administrador (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS canchas (
-    id INT UNSIGNED PRIMARY KEY CHECK (id = 1),
+    id INT UNSIGNED PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     tarifa INT UNSIGNED DEFAULT 30 CHECK (tarifa > 0),
     activa TINYINT UNSIGNED NOT NULL CHECK (activa IN (0, 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO canchas (id, nombre, activa) VALUES (1, 'Cancha de césped sintético', 1)
-ON DUPLICATE KEY UPDATE id = 1;
+INSERT INTO canchas (id, nombre, activa) VALUES (1, 'Chico Chico', 1)
+ON DUPLICATE KEY UPDATE id = id;
 
 CREATE TABLE IF NOT EXISTS clientes (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

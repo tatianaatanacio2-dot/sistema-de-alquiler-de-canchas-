@@ -3,7 +3,7 @@
     <div class="page-heading">
       <div
         ><h1>Reservas</h1
-        ><p>Consulta la agenda y el historial de la cancha.</p></div
+        ><p>Consulta la agenda y el historial de tus canchas.</p></div
       >
       <div class="heading-actions">
         <q-btn
@@ -45,6 +45,19 @@
           <template #prepend><q-icon name="search" /></template>
         </q-input>
         <div class="reservation-filters">
+          <q-select
+            v-model="canchaFiltro"
+            :options="canchas"
+            option-value="id"
+            option-label="nombre"
+            emit-value
+            map-options
+            clearable
+            outlined
+            dense
+            label="Todas las canchas"
+            style="min-width: 180px"
+          />
           <q-input
             v-model="fecha"
             type="date"
@@ -100,6 +113,9 @@
                   />
                 </div>
                 <dl class="record-details">
+                  <div
+                    ><dt>Cancha</dt><dd>{{ row.cancha_nombre }}</dd></div
+                  >
                   <div
                     ><dt>Inicio</dt><dd>{{ horario(row.inicio) }}</dd></div
                   >
@@ -308,21 +324,7 @@
           }}</div></q-card-section
         >
         <q-separator />
-        <q-card-section v-if="!datos.id && (!cancha?.activa || !cancha.tarifa)">
-          <p
-            >Para programar una reserva, verifica la disponibilidad y la tarifa
-            de la cancha.</p
-          >
-          <q-btn
-            flat
-            color="primary"
-            no-caps
-            label="Configurar cancha"
-            to="/cancha"
-          />
-          <q-btn flat no-caps label="Cerrar" v-close-popup />
-        </q-card-section>
-        <q-form v-else @submit="guardar">
+        <q-form @submit="guardar">
           <q-card-section class="form-grid">
             <q-banner
               v-if="errorFormulario"
@@ -331,6 +333,32 @@
               role="alert"
               >{{ errorFormulario }}</q-banner
             >
+            <q-select
+              v-model="datos.cancha_id"
+              :options="canchas"
+              option-value="id"
+              option-label="nombre"
+              emit-value
+              map-options
+              outlined
+              class="full-field"
+              label="Cancha"
+              :disable="!!datos.id || !!esperaId || guardando"
+            />
+            <q-banner
+              v-if="!datos.id && !canchaDisponible"
+              class="full-field bg-orange-1 text-orange-10"
+            >
+              Elige una cancha activa con tarifa configurada.
+              <template #action
+                ><q-btn
+                  flat
+                  color="primary"
+                  no-caps
+                  label="Configurar canchas"
+                  to="/cancha"
+              /></template>
+            </q-banner>
             <q-select
               v-if="!registroNuevo"
               v-model="datos.cliente_id"
@@ -623,6 +651,7 @@
               "
               type="submit"
               :loading="guardando"
+              :disable="!datos.id && !canchaDisponible"
             />
           </q-card-actions>
         </q-form>
@@ -658,6 +687,7 @@ import {
 
 type Formulario = {
   id: number;
+  cancha_id: number;
   cliente_id: number | null;
   inicio: string;
   fin: string;
@@ -668,7 +698,8 @@ type Formulario = {
 const q = useQuasar();
 const route = useRoute();
 const router = useRouter();
-const cancha = ref<Cancha>();
+const canchas = ref<Cancha[]>([]);
+const canchaFiltro = ref<number | null>(null);
 const clientes = ref<Cliente[]>([]);
 const reservas = ref<Reserva[]>([]);
 const reservasParaCruces = ref<Reserva[]>([]);
@@ -681,7 +712,19 @@ const cargando = ref(false);
 const guardando = ref(false);
 const abierto = ref(false);
 const fechaElegida = ref("");
-const datos = ref<Formulario>({ id: 0, cliente_id: null, inicio: "", fin: "" });
+const datos = ref<Formulario>({
+  id: 0,
+  cancha_id: 1,
+  cliente_id: null,
+  inicio: "",
+  fin: ""
+});
+const cancha = computed(() =>
+  canchas.value.find(item => item.id === datos.value.cancha_id)
+);
+const canchaDisponible = computed(() =>
+  Boolean(cancha.value?.activa && cancha.value.tarifa)
+);
 const repetirSemanal = ref(false);
 const cantidadRepeticiones = ref(4);
 const registroNuevo = ref(false);
@@ -713,6 +756,7 @@ const vistaRepeticiones = computed(() => {
     const fin = sumarSemanas(datos.value.fin, i);
     const conflicto = reservasParaCruces.value.some(
       reserva =>
+        reserva.cancha_id === datos.value.cancha_id &&
         reserva.estado !== "cancelada" &&
         reserva.inicio < fin &&
         reserva.fin > inicio
@@ -730,6 +774,13 @@ watch([importe, modalidadPago], () => {
     pago.value.monto = importe.value?.toFixed(2) ?? "";
 });
 const columnas: QTableColumn<Reserva>[] = [
+  {
+    name: "cancha",
+    label: "Cancha",
+    field: "cancha_nombre",
+    align: "left",
+    sortable: true
+  },
   {
     name: "cliente",
     label: "Cliente",
@@ -842,7 +893,7 @@ function enlaceWhatsApp(reserva: Reserva) {
     reserva.fin.slice(0, 10) === reserva.inicio.slice(0, 10)
       ? ""
       : ` Fecha de fin: ${reserva.fin.slice(0, 10).split("-").reverse().join("/")}.`;
-  const mensaje = `Hola ${reserva.cliente}, te confirmamos tu reserva. Fecha: ${fecha}.${fechaFin} Hora de inicio: ${reserva.inicio.slice(11, 16)}. Hora de fin: ${reserva.fin.slice(11, 16)}. Saldo pendiente: ${dinero(saldoReserva(reserva))}. ¿Nos confirmas, por favor?`;
+  const mensaje = `Hola ${reserva.cliente}, te confirmamos tu reserva en ${reserva.cancha_nombre}. Fecha: ${fecha}.${fechaFin} Hora de inicio: ${reserva.inicio.slice(11, 16)}. Hora de fin: ${reserva.fin.slice(11, 16)}. Saldo pendiente: ${dinero(saldoReserva(reserva))}. ¿Nos confirmas, por favor?`;
   return "https://wa.me/" + telefono + "?text=" + encodeURIComponent(mensaje);
 }
 let secuencia = 0;
@@ -929,6 +980,7 @@ async function cargar() {
   const filtros = new URLSearchParams();
   if (fecha.value) filtros.set("fecha", fecha.value);
   if (estado.value) filtros.set("estado", estado.value);
+  if (canchaFiltro.value) filtros.set("cancha_id", String(canchaFiltro.value));
   try {
     const filas = await api<Reserva[]>("/reservas?" + filtros);
     if (solicitud === secuencia) reservas.value = filas;
@@ -939,17 +991,26 @@ async function cargar() {
   }
 }
 
-async function editar(reserva?: Reserva) {
+async function editar(reserva?: Reserva, canchaId = canchaFiltro.value) {
   error.value = "";
   esperaId.value = null;
   try {
-    [cancha.value, clientes.value] = await Promise.all([
-      api<Cancha>("/cancha"),
+    [canchas.value, clientes.value] = await Promise.all([
+      api<Cancha[]>("/canchas"),
       api<Cliente[]>("/clientes")
     ]);
+    const seleccionada =
+      canchas.value.find(item => item.id === canchaId) ??
+      canchas.value.find(item => item.activa && item.tarifa);
     datos.value = reserva
       ? { ...reserva }
-      : { id: 0, cliente_id: null, inicio: "", fin: "" };
+      : {
+          id: 0,
+          cancha_id: seleccionada?.id ?? 1,
+          cliente_id: null,
+          inicio: "",
+          fin: ""
+        };
     repetirSemanal.value = false;
     cantidadRepeticiones.value = 4;
     fechaElegida.value = datos.value.inicio.slice(0, 10);
@@ -966,14 +1027,15 @@ async function editar(reserva?: Reserva) {
 }
 
 async function reservarDeNuevo(reserva: Reserva) {
-  await editar();
+  await editar(undefined, reserva.cancha_id);
   if (abierto.value) datos.value.cliente_id = reserva.cliente_id;
 }
 
 async function guardar() {
+  if (guardando.value || (!datos.value.id && !canchaDisponible.value)) return;
   guardando.value = true;
   errorFormulario.value = "";
-  const { id, cliente_id, inicio, fin } = datos.value;
+  const { id, cancha_id, cliente_id, inicio, fin } = datos.value;
   if (!inicio || !fin) {
     errorFormulario.value = "Selecciona una fecha para fijar el horario.";
     guardando.value = false;
@@ -1004,7 +1066,7 @@ async function guardar() {
       ? { cliente_nuevo: nuevoCliente.value }
       : { cliente_id };
     const cobro = !id && cobrarAhora.value ? { pago_inicial: pago.value } : {};
-    const datosReserva = { inicio, fin, ...cliente, ...cobro };
+    const datosReserva = { cancha_id, inicio, fin, ...cliente, ...cobro };
     const guardadas =
       repetirSemanal.value && !id
         ? await api<Reserva[]>("/reservas/repetir", "POST", {
@@ -1088,16 +1150,23 @@ function cambiarEstado(reserva: Reserva, destino: "completada" | "cancelada") {
   });
 }
 
-watch([fecha, estado], cargar);
+watch([fecha, estado, canchaFiltro], cargar);
 onMounted(async () => {
   await cargar();
   try {
-    clientes.value = await api<Cliente[]>("/clientes");
+    [canchas.value, clientes.value] = await Promise.all([
+      api<Cancha[]>("/canchas"),
+      api<Cliente[]>("/clientes")
+    ]);
   } catch {
-    /* El listado sigue funcionando sin la acción de WhatsApp. */
+    /* El listado sigue funcionando sin los selectores cargados. */
   }
   if (route.query.nueva) {
     const esperaSolicitada = route.query.espera;
+    const canchaId =
+      typeof route.query.cancha === "string"
+        ? Number(route.query.cancha)
+        : null;
     const inicio =
       typeof route.query.inicio === "string" ? route.query.inicio : "";
     const fin = typeof route.query.fin === "string" ? route.query.fin : "";
@@ -1105,18 +1174,15 @@ onMounted(async () => {
     if (esperaSolicitada) {
       try {
         const idEspera = Number(esperaSolicitada);
-        const [configuracion, filasClientes, solicitudes] = await Promise.all([
-          api<Cancha>("/cancha"),
-          api<Cliente[]>("/clientes"),
-          api<EntradaEspera[]>("/lista-espera")
-        ]);
+        const solicitudes = await api<EntradaEspera[]>("/lista-espera");
         const solicitud = solicitudes.find(fila => fila.id === idEspera);
         if (!solicitud || !["disponible", "avisado"].includes(solicitud.estado))
           throw new Error("La solicitud ya no está disponible para reservar.");
-        cancha.value = configuracion;
-        clientes.value = filasClientes;
+        await editar(undefined, 1);
+        if (!abierto.value) return;
         datos.value = {
           id: 0,
+          cancha_id: 1,
           cliente_id: solicitud.cliente_id,
           inicio: solicitud.inicio,
           fin: solicitud.fin
@@ -1130,7 +1196,7 @@ onMounted(async () => {
         error.value = (problema as Error).message;
       }
     } else {
-      await editar();
+      await editar(undefined, canchaId);
       if (
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(inicio) &&
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(fin)

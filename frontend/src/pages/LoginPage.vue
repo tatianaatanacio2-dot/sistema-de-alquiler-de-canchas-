@@ -130,6 +130,16 @@
           label="Reintentar"
           @click="consultar"
         />
+        <q-btn
+          v-if="!android"
+          to="/horarios"
+          flat
+          no-caps
+          color="primary"
+          class="q-mt-md"
+          icon="event_available"
+          label="Consultar horarios"
+        />
         <q-inner-loading :showing="conectando && !android" />
       </div>
     </section>

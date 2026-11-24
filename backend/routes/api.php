@@ -3,12 +3,15 @@
 use App\Http\Controllers\AccesoController;
 use App\Http\Controllers\AlquilerController;
 use App\Http\Controllers\FinanzasController;
+use App\Http\Controllers\HorariosPublicosController;
 use App\Http\Controllers\PortalController;
 use App\Http\Middleware\SesionAdministrador;
 use App\Http\Middleware\SesionCliente;
 use Illuminate\Support\Facades\Route;
 
 Route::get('acceso', [AccesoController::class, 'estado']);
+Route::get('canchas', [HorariosPublicosController::class, 'canchas'])->middleware('throttle:60,1');
+Route::get('horarios', HorariosPublicosController::class)->middleware('throttle:60,1');
 Route::middleware('throttle:acceso')->group(function () {
     Route::post('configurar', [AccesoController::class, 'configurar']);
     Route::post('ingresar', [AccesoController::class, 'ingresar']);

@@ -15,10 +15,22 @@
         no-caps
         label="Nueva reserva"
         icon="add"
-        :to="{ path: '/reservas', query: { nueva: '1' } }"
+        :to="{ path: '/reservas', query: { nueva: '1', cancha: canchaId } }"
       />
     </div>
     <div class="row items-center q-gutter-sm q-mb-lg">
+      <q-select
+        v-model="canchaId"
+        :options="canchas"
+        option-value="id"
+        option-label="nombre"
+        emit-value
+        map-options
+        outlined
+        dense
+        label="Cancha"
+        style="min-width: 160px"
+      />
       <q-btn
         flat
         round
@@ -170,7 +182,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { api, horario } from "@/services/api";
+import { api, horario, type Cancha } from "@/services/api";
 import { fechaLocal } from "@/services/finanzas";
 
 type Intervalo = { inicio: string; fin: string };
@@ -182,12 +194,15 @@ type Disponibilidad = {
 };
 const router = useRouter();
 const fecha = ref(fechaLocal());
+const canchas = ref<Cancha[]>([]);
+const canchaId = ref(1);
 const datos = ref<Disponibilidad>();
 const error = ref("");
 const cargando = ref(false);
 let secuencia = 0;
 async function cargar() {
   const actual = ++secuencia;
+  datos.value = undefined;
   if (!fecha.value) {
     datos.value = undefined;
     cargando.value = false;
@@ -196,9 +211,11 @@ async function cargar() {
   cargando.value = true;
   error.value = "";
   try {
-    const resultado = await api<Disponibilidad>(
-      "/disponibilidad?fecha=" + fecha.value
-    );
+    const filtros = new URLSearchParams({
+      fecha: fecha.value,
+      cancha_id: String(canchaId.value)
+    });
+    const resultado = await api<Disponibilidad>("/disponibilidad?" + filtros);
     if (actual === secuencia) datos.value = resultado;
   } catch (problema) {
     if (actual === secuencia) error.value = (problema as Error).message;
@@ -226,9 +243,16 @@ function reservar(intervalo: Intervalo) {
     .slice(0, 16);
   void router.push({
     path: "/reservas",
-    query: { nueva: "1", inicio: intervalo.inicio, fin }
+    query: { nueva: "1", cancha: canchaId.value, inicio: intervalo.inicio, fin }
   });
 }
-watch(fecha, cargar);
-onMounted(cargar);
+watch([fecha, canchaId], cargar);
+onMounted(async () => {
+  await cargar();
+  try {
+    canchas.value = await api<Cancha[]>("/canchas");
+  } catch (problema) {
+    error.value = (problema as Error).message;
+  }
+});
 </script>

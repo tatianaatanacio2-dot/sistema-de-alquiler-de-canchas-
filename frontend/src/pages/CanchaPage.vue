@@ -2,9 +2,10 @@
   <q-page class="workspace">
     <div class="page-heading"
       ><div
-        ><h1>Mi cancha</h1
+        ><span class="eyebrow">GESTIÓN DE ALQUILERES</span><h1>Canchas</h1
         ><p
-          >Gestiona la tarifa y la disponibilidad para nuevos alquileres.</p
+          >Elige una cancha de césped sintético para configurar su nombre,
+          tarifa y disponibilidad.</p
         ></div
       ></div
     >
@@ -22,6 +23,19 @@
         ><q-icon name="sports_soccer" color="primary" size="27px"
       /></div>
       <q-form class="panel-form form-grid" @submit="guardar">
+        <q-select
+          :model-value="cancha.id"
+          :options="canchas"
+          option-value="id"
+          option-label="nombre"
+          emit-value
+          map-options
+          outlined
+          class="full-field"
+          label="Cancha que deseas configurar"
+          :disable="guardando"
+          @update:model-value="seleccionar"
+        />
         <q-input
           v-model="cancha.nombre"
           outlined
@@ -71,25 +85,40 @@ import { useQuasar } from "quasar";
 import { api, type Cancha } from "@/services/api";
 
 const q = useQuasar();
+const canchas = ref<Cancha[]>([]);
 const cancha = ref<Cancha>();
 const cargando = ref(true);
 const guardando = ref(false);
 const error = ref("");
 onMounted(async () => {
   try {
-    cancha.value = await api<Cancha>("/cancha");
+    canchas.value = await api<Cancha[]>("/canchas");
+    if (canchas.value[0]) seleccionar(canchas.value[0].id);
   } catch (problema) {
     error.value = (problema as Error).message;
   } finally {
     cargando.value = false;
   }
 });
+function seleccionar(id: number) {
+  const seleccionada = canchas.value.find(item => item.id === id);
+  if (seleccionada)
+    cancha.value = { ...seleccionada, activa: seleccionada.activa ? 1 : 0 };
+  error.value = "";
+}
 async function guardar() {
   if (!cancha.value) return;
   guardando.value = true;
   error.value = "";
   try {
-    cancha.value = await api<Cancha>("/cancha", "PUT", cancha.value);
+    const actualizada = await api<Cancha>("/cancha", "PUT", {
+      ...cancha.value,
+      cancha_id: cancha.value.id
+    });
+    canchas.value = canchas.value.map(item =>
+      item.id === actualizada.id ? actualizada : item
+    );
+    seleccionar(actualizada.id);
     q.notify({ type: "positive", message: "Configuración guardada." });
   } catch (problema) {
     error.value = (problema as Error).message;

@@ -3,7 +3,7 @@
     <div class="page-heading">
       <div
         ><h1>Resumen general</h1
-        ><p>Consulta la agenda y la disponibilidad de la cancha.</p></div
+        ><p>Consulta la agenda y la disponibilidad de tus canchas.</p></div
       >
       <div class="heading-actions">
         <q-btn
@@ -128,7 +128,7 @@
         <section class="panel">
           <div class="panel-heading">
             <div
-              ><h2>Agenda de la cancha</h2
+              ><h2>Agenda de las canchas</h2
               ><p>Horarios del local · {{ datos.zonaHoraria }}</p></div
             >
             <q-btn
@@ -170,7 +170,7 @@
               <q-item-section
                 ><q-item-label>{{ reserva.cliente }}</q-item-label
                 ><q-item-label caption
-                  >{{ horario(reserva.inicio) }} —
+                  >{{ reserva.cancha_nombre }} · {{ horario(reserva.inicio) }} —
                   {{ horario(reserva.fin) }}</q-item-label
                 ><q-item-label caption
                   >{{ estadoPago(reserva).label }} · Abonado
@@ -188,26 +188,35 @@
         </section>
         <section class="panel">
           <div class="panel-heading"
-            ><div
-              ><h2>{{ datos.cancha.nombre }}</h2
-              ><p>Fútbol · Césped sintético</p></div
+            ><div><h2>Canchas</h2><p>Fútbol · Césped sintético</p></div
             ><q-icon name="sports_soccer" color="primary" size="27px"
           /></div>
-          <div class="q-pa-lg">
-            <p class="text-grey-7 q-mb-xs">Tarifa por hora</p>
-            <div class="text-h5 text-weight-medium">{{
-              datos.cancha.tarifa
-                ? dinero(datos.cancha.tarifa)
-                : "Por configurar"
-            }}</div>
+          <q-list separator>
+            <q-item v-for="cancha in datos.canchas" :key="cancha.id">
+              <q-item-section
+                ><q-item-label>{{ cancha.nombre }}</q-item-label
+                ><q-item-label caption>{{
+                  cancha.tarifa
+                    ? dinero(cancha.tarifa) + " por hora"
+                    : "Tarifa por configurar"
+                }}</q-item-label></q-item-section
+              >
+              <q-item-section side
+                ><q-badge
+                  outline
+                  :color="cancha.activa ? 'green-9' : 'grey-7'"
+                  :label="cancha.activa ? 'Activa' : 'Inactiva'"
+              /></q-item-section>
+            </q-item>
+          </q-list>
+          <div class="q-pa-md">
             <q-btn
               flat
               no-caps
               color="primary"
-              label="Configurar cancha"
+              label="Configurar canchas"
               icon-right="arrow_forward"
               to="/cancha"
-              class="q-mt-md"
             />
           </div>
         </section>
@@ -230,7 +239,7 @@ import {
 import { estadoPago, type Totales } from "@/services/finanzas";
 
 type Resumen = {
-  cancha: Cancha;
+  canchas: Cancha[];
   clientes: number;
   totalHoy: number;
   totalProximas: number;
@@ -264,8 +273,8 @@ const tarjetas = computed(() => {
       color: "bg-orange-1 text-orange-9"
     },
     {
-      nombre: "Mi cancha",
-      valor: datos.value.cancha.activa ? "Activa" : "Inactiva",
+      nombre: "Canchas activas",
+      valor: datos.value.canchas.filter(cancha => cancha.activa).length,
       nota: "Césped sintético",
       icono: "sports_soccer",
       color: "bg-green-1 text-green-9"

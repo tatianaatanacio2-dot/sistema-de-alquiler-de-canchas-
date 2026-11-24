@@ -1,6 +1,6 @@
 # Sistema de alquiler de cancha
 
-Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reservas con horarios sin cruces e historial de cancelaciones, lista de espera y reservas repetidas. La tarifa inicial es S/ 30 por hora y la agenda usa la hora de Perú (America/Lima).
+Agenda para cinco canchas de fútbol de césped sintético. Incluye clientes, reservas con horarios sin cruces dentro de la misma cancha, historial de cancelaciones, lista de espera y reservas repetidas. La tarifa inicial es S/ 30 por hora y la agenda usa la hora de Perú (America/Lima).
 
 La preparación para VPS, Nginx, HTTPS, copias, actualizaciones y Android está en [Instalación y mantenimiento](deploy/OPERACION.md). Consulta [la auditoría y sus pruebas](deploy/AUDITORIA.md) antes de publicar. La aplicación incluye un portal de clientes con registro, reservas propias y cancelación de horarios futuros. Selecciona **Cliente** al iniciar sesión; las pantallas administrativas requieren una cuenta administrativa.
 
@@ -36,6 +36,12 @@ Para cargar datos ficticios de uso diario, ejecuta `php artisan canchas:demostra
 
    Si tu instalación usa otra contraseña o usuario de MariaDB, ajusta `DB_USERNAME` y `DB_PASSWORD` en `backend/.env`.
 4. Abre [la web local](http://127.0.0.1:8012/) y crea la primera cuenta de administrador.
+
+## Horarios para clientes
+
+En `/#/horarios` se puede elegir entre Chico Chico, Genry, El Golazo, Miky y Cevichón y consultar la disponibilidad de cada cancha sin iniciar sesión. El administrador puede cambiar sus nombres, tarifas y disponibilidad, y elegir la cancha al programar una reserva.
+
+El horario público inicial es de 16:00 a 22:00. Puedes ajustarlo en `backend/.env` con `CANCHA_APERTURA` y `CANCHA_CIERRE`. Configura `CANCHA_WHATSAPP` con el código de país y el número del negocio, usando solo dígitos, para habilitar las solicitudes por WhatsApp.
 
 ## Android
 
@@ -88,6 +94,6 @@ El APK intenta conectarse al servidor inicial cuando todavía no hay una direcci
 
 4. Sube el AAB firmado a una pista de pruebas en Play Console. Comprueba el acceso, las reservas y el cierre de sesión en un dispositivo con el servidor HTTPS definitivo. Completa la ficha, las declaraciones de privacidad y los datos de acceso para revisión antes de solicitar producción. [Publicar con Play Console](https://support.google.com/googleplay/android-developer/answer/9859152?hl=es)
 
-La aplicación administra una cancha. Los contactos previos se conservan separados de las cuentas creadas en el nuevo portal; no se vinculan automáticamente por correo para evitar que alguien pueda apropiarse de reservas antiguas. El panel administrativo sigue usando la cuenta administrativa del servidor.
+Los contactos previos se conservan separados de las cuentas creadas en el nuevo portal; no se vinculan automáticamente por correo para evitar que alguien pueda apropiarse de reservas antiguas. El panel administrativo sigue usando la cuenta administrativa del servidor.
 
 Para preparar un paquete de publicación, establece `CANCHAS_SERVIDOR` con la dirección HTTPS pública y ejecuta `.\compilar.ps1 -Publicacion`. Esta variante acepta conexiones HTTPS y genera **Alquiler-de-cancha-sin-firmar.aab** en la raíz para firmarlo antes de publicarlo.

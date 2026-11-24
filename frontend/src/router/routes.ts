@@ -2,6 +2,11 @@ import type { RouteRecordRaw } from "vue-router";
 
 const routes: RouteRecordRaw[] = [
   {
+    path: "/horarios",
+    component: () => import("@/pages/HorariosPage.vue"),
+    meta: { public: true }
+  },
+  {
     path: "/ingresar",
     component: () => import("@/pages/LoginPage.vue"),
     meta: { public: true }
@@ -19,7 +24,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: "cancha",
         component: () => import("@/pages/CanchaPage.vue"),
-        meta: { title: "Mi cancha" }
+        meta: { title: "Canchas" }
       },
       {
         path: "clientes",

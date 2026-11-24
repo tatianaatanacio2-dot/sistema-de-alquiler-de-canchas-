@@ -32,7 +32,7 @@ return new class extends Migration
 
         if (Schema::hasTable('pagos_legacy')) {
             foreach (DB::table('pagos_legacy')->orderBy('id')->cursor() as $pago) {
-                $operacion = $this->operacionLegada((int) $pago->id);
+                $operacion = $this->operacionLegada((string) $pago->id);
                 if (DB::table('pagos')->where('operacion', $operacion)->exists()) {
                     continue;
                 }
@@ -41,10 +41,10 @@ return new class extends Migration
                     'operacion' => $operacion,
                     'reserva_id' => $pago->reserva_id,
                     'tipo' => 'cobro',
-                    'monto' => $pago->monto,
+                    'monto' => $pago->monto ?? $pago->importe,
                     'metodo' => $pago->metodo === 'yape_plin' ? 'yape' : $pago->metodo,
                     'nota' => $pago->referencia ?? '',
-                    'fecha' => $pago->registrado_en,
+                    'fecha' => $pago->registrado_en ?? $pago->creado_en,
                 ]);
             }
         }
@@ -81,7 +81,7 @@ return new class extends Migration
         }
     }
 
-    private function operacionLegada(int $id): string
+    private function operacionLegada(string $id): string
     {
         $hash = hash('sha256', 'pago-legado-'.$id);
 

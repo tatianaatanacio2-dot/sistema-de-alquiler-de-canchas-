@@ -37,6 +37,18 @@
         <q-card flat bordered class="q-mt-md q-pa-md">
           <h2 class="text-h6 q-mt-none">Reserva tu cancha</h2>
           <q-form @submit="reservar" class="q-gutter-md">
+            <q-select
+              v-model="canchaId"
+              :options="canchas"
+              option-value="id"
+              option-label="nombre"
+              emit-value
+              map-options
+              outlined
+              label="Cancha"
+              :disable="consultando || guardando"
+              @update:model-value="libres = null"
+            />
             <div class="row q-col-gutter-md">
               <q-input
                 class="col-12 col-sm-6"
@@ -81,7 +93,7 @@
                 label="Confirmar reserva"
                 no-caps
                 :loading="guardando"
-                :disable="!cancha?.activa"
+                :disable="!cancha?.activa || !cancha.tarifa"
             /></div>
           </q-form>
         </q-card>
@@ -97,7 +109,7 @@
           <div class="row items-center justify-between q-gutter-sm">
             <div
               ><strong
-                >#{{ reserva.id }} · {{ estados[reserva.estado] }}</strong
+                >#{{ reserva.id }} · {{ reserva.cancha_nombre }} · {{ estados[reserva.estado] }}</strong
               >
               <p class="q-mb-xs"
                 >{{ horario(reserva.inicio) }} — {{ horario(reserva.fin) }}</p
@@ -129,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import {
@@ -144,7 +156,9 @@ import {
 } from "@/services/api";
 const router = useRouter();
 const q = useQuasar();
-const cancha = ref<Cancha>();
+const canchas = ref<Cancha[]>([]);
+const canchaId = ref(1);
+const cancha = computed(() => canchas.value.find(item => item.id === canchaId.value));
 const reservas = ref<Reserva[]>([]);
 const inicio = ref("");
 const fin = ref("");
@@ -158,8 +172,8 @@ async function cargar() {
   cargando.value = true;
   error.value = "";
   try {
-    [cancha.value, reservas.value] = await Promise.all([
-      api<Cancha>("/portal/cancha"),
+    [canchas.value, reservas.value] = await Promise.all([
+      api<Cancha[]>("/canchas"),
       api<Reserva[]>("/portal/reservas")
     ]);
   } catch (e) {
@@ -174,8 +188,12 @@ async function disponibilidad() {
   libres.value = null;
   error.value = "";
   try {
+    const filtros = new URLSearchParams({
+      cancha_id: String(canchaId.value),
+      fecha: inicio.value.slice(0, 10)
+    });
     const resultado = await api<{ libres: { inicio: string; fin: string }[] }>(
-      "/portal/disponibilidad?fecha=" + inicio.value.slice(0, 10)
+      "/portal/disponibilidad?" + filtros
     );
     libres.value = resultado.libres.length
       ? resultado.libres
@@ -194,6 +212,7 @@ async function reservar() {
   error.value = "";
   try {
     const reserva = await api<Reserva>("/portal/reservas", "POST", {
+      cancha_id: canchaId.value,
       inicio: inicio.value,
       fin: fin.value
     });

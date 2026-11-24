@@ -106,7 +106,7 @@ const navegacion = [
   { ruta: "/", nombre: "Resumen", icono: "space_dashboard" },
   { ruta: "/reservas", nombre: "Reservas", icono: "calendar_month" },
   { ruta: "/clientes", nombre: "Clientes", icono: "people_outline" },
-  { ruta: "/cancha", nombre: "Cancha", icono: "sports_soccer" },
+  { ruta: "/cancha", nombre: "Canchas", icono: "sports_soccer" },
   { ruta: "/lista-espera", nombre: "Lista de espera", icono: "hourglass_top" }
 ];
 const gestion = [
@@ -116,6 +116,7 @@ const gestion = [
     icono: "event_available"
   },
   { ruta: "/pagos", nombre: "Pagos", icono: "payments" },
+  { ruta: "/horarios", nombre: "Horarios públicos", icono: "event_available" },
   { ruta: "/caja", nombre: "Caja diaria", icono: "account_balance_wallet" },
   { ruta: "/historial", nombre: "Historial de cambios", icono: "history" },
   { ruta: "/reportes", nombre: "Reportes", icono: "assessment" }

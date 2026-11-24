@@ -102,7 +102,8 @@
         <q-card-section
           ><h2>Pagos de la reserva #{{ reserva.id }}</h2
           ><div class="text-caption text-grey-7"
-            >{{ reserva.cliente }} · {{ horario(reserva.inicio) }}</div
+            >{{ reserva.cliente }} · {{ reserva.cancha_nombre }} ·
+            {{ horario(reserva.inicio) }}</div
           ></q-card-section
         >
         <q-separator />
@@ -387,6 +388,13 @@ const tipos = computed(() =>
       ]
 );
 const columnas: QTableColumn<Reserva>[] = [
+  {
+    name: "cancha",
+    label: "Cancha",
+    field: "cancha_nombre",
+    align: "left",
+    sortable: true
+  },
   {
     name: "id",
     label: "Reserva",
