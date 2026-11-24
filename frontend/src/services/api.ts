@@ -1,4 +1,5 @@
 import { reactive, ref } from 'vue';
+import { normalizarServidor } from './servidor';
 
 export type Usuario = { nombre: string; correo: string };
 export type Cancha = { id: number; nombre: string; tarifa: number | null; activa: number | boolean };
@@ -18,47 +19,94 @@ export type Acceso = { requiereCuenta: boolean; equipoLocal: boolean };
 type Credenciales = { token: string; usuario: Usuario };
 
 export const android = import.meta.env.QUASAR_CAPACITOR_MODE;
-export const servidor = ref(localStorage.getItem('canchas.servidor') || '');
+const admiteHttpLocal = !import.meta.env.CANCHAS_PUBLICACION;
+function leerServidorGuardado() {
+  const direccion = localStorage.getItem('canchas.servidor');
+  try {
+    return direccion ? normalizarServidor(direccion, admiteHttpLocal) : '';
+  } catch {
+    return '';
+  }
+}
+
+const servidorGuardado = android ? leerServidorGuardado() : '';
+export const servidor = ref(android ? servidorGuardado || import.meta.env.CANCHAS_SERVIDOR : '');
 export const session = reactive<{ usuario: Usuario | null; lista: boolean }>({ usuario: null, lista: false });
 let token = sessionStorage.getItem('canchas.token') || '';
+if (android && !servidorGuardado) cerrarSesion();
 
-export function conectar(direccion: string) {
-  const url = new URL(direccion.trim());
-  const privada = /^(?:10\.\d+|192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d+\.\d+$/.test(url.hostname);
-  if (url.username || url.password || url.pathname !== '/' || url.search || url.hash
-    || !(url.protocol === 'https:' || (url.protocol === 'http:' && privada))) {
-    throw new Error('Ingresa la dirección del servidor local, por ejemplo http://192.168.1.10:8012.');
+export class ErrorApi extends Error {
+  constructor(message: string, readonly estado: number) {
+    super(message);
   }
-  if (url.origin !== servidor.value) {
-    cerrarSesion();
+}
+
+export async function conectar(direccion: string) {
+  const origen = normalizarServidor(direccion, admiteHttpLocal);
+  const acceso = await solicitar<Acceso>(origen, '/acceso', 'GET');
+  if (typeof acceso.requiereCuenta !== 'boolean' || typeof acceso.equipoLocal !== 'boolean') {
+    throw new Error('Esta dirección no corresponde a un servidor de Canchas compatible.');
   }
-  servidor.value = url.origin;
-  localStorage.setItem('canchas.servidor', url.origin);
+  if (origen !== servidor.value) cerrarSesion();
+  localStorage.setItem('canchas.servidor', origen);
+  servidor.value = origen;
+  return acceso;
+}
+
+async function solicitar<T>(origen: string, ruta: string, method: string, datos?: unknown, credencial = ''): Promise<T> {
+  const url = origen + '/api' + ruta;
+  const headers = {
+    Accept: 'application/json',
+    ...(datos === undefined ? {} : { 'Content-Type': 'application/json' }),
+    ...(credencial ? { Authorization: 'Bearer ' + credencial } : {}),
+  };
+  let estado: number;
+  let contenido;
+  try {
+    if (import.meta.env.QUASAR_CAPACITOR_MODE) {
+      const { CapacitorHttp } = await import('@capacitor/core');
+      const respuesta = await CapacitorHttp.request({
+        url, method, headers, data: datos, connectTimeout: 8000, readTimeout: 12000, disableRedirects: true,
+      });
+      estado = respuesta.status;
+      contenido = respuesta.data;
+    } else {
+      const controlador = new AbortController();
+      const limite = setTimeout(() => controlador.abort(), 12000);
+      try {
+        const respuesta = await fetch(url, {
+          method, headers, body: datos === undefined ? null : JSON.stringify(datos), signal: controlador.signal,
+          redirect: 'error',
+        });
+        estado = respuesta.status;
+        contenido = await respuesta.json().catch(() => null);
+      } finally {
+        clearTimeout(limite);
+      }
+    }
+  } catch {
+    throw new Error('No se pudo conectar. Verifica tu conexión y la dirección del servidor.');
+  }
+  if (estado < 200 || estado >= 300 || typeof contenido !== 'object' || contenido === null) {
+    const validacion = contenido?.errors && Object.values(contenido.errors).flat().join(' ');
+    const mensaje = estado === 429 ? 'Demasiados intentos. Espera un minuto y vuelve a intentar.'
+      : validacion || contenido?.message || 'El servidor no pudo completar la operación.';
+    throw new ErrorApi(mensaje, estado);
+  }
+  return contenido as T;
 }
 
 export async function api<T>(ruta: string, method = 'GET', datos?: unknown): Promise<T> {
-  let respuesta: Response;
+  const origen = servidor.value;
+  if (android && !origen) throw new Error('Conecta primero con el servidor de Canchas.');
+  const credencial = token;
   try {
-    respuesta = await fetch((android ? servidor.value : '') + '/api' + ruta, {
-      method,
-      headers: {
-        Accept: 'application/json',
-        ...(datos === undefined ? {} : { 'Content-Type': 'application/json' }),
-        ...(token ? { Authorization: 'Bearer ' + token } : {}),
-      },
-      ...(datos === undefined ? {} : { body: JSON.stringify(datos) }),
-      signal: AbortSignal.timeout(12000),
-    });
-  } catch {
-    throw new Error('No se pudo conectar con el servidor de reservas.');
+    return await solicitar<T>(origen, ruta, method, datos, credencial);
+  } catch (problema) {
+    if (problema instanceof ErrorApi && problema.estado === 401 && credencial === token
+      && origen === servidor.value) cerrarSesion();
+    throw problema;
   }
-  const contenido = await respuesta.json().catch(() => null);
-  if (!respuesta.ok || contenido === null) {
-    if (respuesta.status === 401) cerrarSesion();
-    const validacion = contenido?.errors && Object.values(contenido.errors).flat().join(' ');
-    throw new Error(validacion || contenido?.message || 'No se pudo completar la operación.');
-  }
-  return contenido as T;
 }
 
 export async function ingresar(datos: { nombre: string; correo: string; clave: string }, configurar: boolean) {
@@ -71,7 +119,7 @@ export async function ingresar(datos: { nombre: string; correo: string; clave: s
 export async function cargarSesion() {
   if (token) {
     try { session.usuario = await api<Usuario>('/sesion'); }
-    catch { cerrarSesion(); }
+    catch { /* La API elimina el token si el servidor rechaza la sesión. */ }
   }
   session.lista = true;
 }
@@ -88,9 +136,10 @@ export const estados: Record<Estado, string> = {
 export const colores: Record<Estado, string> = {
   confirmada: 'cyan-9', completada: 'green-9', cancelada: 'red-8',
 };
-export const dinero = (importe: number | string) => new Intl.NumberFormat('es-PE', {
+const moneda = new Intl.NumberFormat('es-PE', {
   style: 'currency', currency: 'PEN',
-}).format(Number(importe));
+});
+export const dinero = (importe: number | string) => moneda.format(Number(importe));
 export function horario(valor: string) {
   const [anio, mes, dia] = valor.slice(0, 10).split('-');
   return dia + '/' + mes + '/' + anio + ' · ' + valor.slice(11, 16);

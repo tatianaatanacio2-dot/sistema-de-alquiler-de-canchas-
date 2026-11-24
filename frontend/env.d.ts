@@ -12,4 +12,7 @@
  *   readonly MY_OTHER_VAR: string;
  * }
  */
-interface ImportMetaEnv {}
+interface ImportMetaEnv {
+  readonly CANCHAS_SERVIDOR: string;
+  readonly CANCHAS_PUBLICACION: boolean;
+}

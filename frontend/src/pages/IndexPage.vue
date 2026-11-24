@@ -1,7 +1,7 @@
 <template>
   <q-page class="workspace">
     <div class="page-heading">
-      <div><span class="eyebrow">TU CANCHA, EN UN VISTAZO</span><h1>Resumen general</h1><p>Consulta la agenda y la disponibilidad de la cancha.</p></div>
+      <div><h1>Resumen general</h1><p>Consulta la agenda y la disponibilidad de la cancha.</p></div>
       <div class="row items-center q-gutter-sm">
         <q-btn flat round color="primary" icon="refresh" aria-label="Actualizar resumen" :loading="cargando" @click="cargar" />
         <q-btn color="primary" unelevated no-caps icon="add" label="Nueva reserva" :to="{ path: '/reservas', query: { nueva: '1' } }" />
@@ -16,8 +16,8 @@
       <div class="stats-grid">
         <div v-for="tarjeta in tarjetas" :key="tarjeta.nombre" class="stat-card">
           <div class="row justify-between items-center">
-            <span>{{ tarjeta.nombre }}</span>
             <div class="stat-icon" :class="tarjeta.color"><q-icon :name="tarjeta.icono" size="22px" /></div>
+            <span>{{ tarjeta.nombre }}</span>
           </div>
           <strong>{{ tarjeta.valor }}</strong><small>{{ tarjeta.nota }}</small>
         </div>
@@ -49,8 +49,8 @@
           </q-tabs>
           <div v-if="!datos[agenda].length" class="empty-state"><q-icon name="event_available" size="44px" /><h3>Sin reservas en esta vista</h3><p>Los alquileres aparecerán aquí al programarlos.</p></div>
           <q-list v-else separator>
-            <q-item v-for="reserva in datos[agenda]" :key="reserva.id" class="request-row">
-              <q-item-section avatar><q-avatar class="patient-avatar" icon="event" /></q-item-section>
+            <q-item v-for="reserva in datos[agenda]" :key="reserva.id" class="agenda-row">
+              <q-item-section avatar><q-avatar class="event-avatar" icon="event" /></q-item-section>
               <q-item-section><q-item-label>{{ reserva.cliente }}</q-item-label><q-item-label caption>{{ horario(reserva.inicio) }} — {{ horario(reserva.fin) }}</q-item-label><q-item-label caption>{{ estadoPago(reserva).label }} · Abonado {{ dinero(reserva.abonado) }}</q-item-label></q-item-section>
               <q-item-section side><q-badge outline :color="colores[reserva.estado]" :label="estados[reserva.estado]" /></q-item-section>
             </q-item>
@@ -65,11 +65,6 @@
           </div>
         </section>
       </div>
-      <section class="care-banner">
-        <div class="care-banner-icon"><q-icon name="sports_soccer" size="40px" /></div>
-        <div><span class="eyebrow">ALQUILER DEPORTIVO</span><h2>Organiza el próximo partido</h2><p>Elige al cliente y confirma su horario de alquiler.</p></div>
-        <q-btn flat no-caps color="primary" label="Programar reserva" icon-right="arrow_forward" :to="{ path: '/reservas', query: { nueva: '1' } }" />
-      </section>
     </template>
   </q-page>
 </template>

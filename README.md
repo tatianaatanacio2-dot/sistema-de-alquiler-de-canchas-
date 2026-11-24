@@ -33,8 +33,55 @@ Para cargar datos ficticios de uso diario, ejecuta `php artisan canchas:demostra
 
 ## Android
 
-Descarga **Alquiler-de-cancha.apk** desde [Entregas](../../releases/latest). Para usarlo desde el teléfono, inicia la web con la opción `-RedLocal`. Conecta el teléfono a la misma red y escribe en el APK la dirección que indica el script. Usa la misma cuenta de la web.
+1. Instala **Alquiler-de-cancha.apk** desde [Entregas](../../releases/latest) o compílalo con las instrucciones de abajo.
+2. Para usarlo por Wi-Fi, inicia el servidor en la computadora del local con `powershell -ExecutionPolicy Bypass -File .\iniciar.ps1 -RedLocal -Php $php`. Conecta el teléfono a la misma red. Si el teléfono no alcanza el servidor, comprueba que el firewall de Windows permita conexiones al puerto TCP 8012 en la red privada.
+3. En la app, escribe en **Servidor** la dirección que imprime el script, por ejemplo `http://192.168.1.10:8012`, y pulsa **Conectar**. También puedes escribir `192.168.1.10:8012`. Para un servidor accesible por Internet, usa una dirección HTTPS con certificado válido, por ejemplo `https://canchas.ejemplo.com`. Introduce solo la dirección base, sin `/api` ni otras rutas.
+4. Inicia sesión con la cuenta de la web. Si aún no existe, créala primero en el navegador de la computadora que aloja el sistema.
+
+La app comprueba la conexión antes de guardar la dirección. En los siguientes inicios se conecta a la última dirección guardada. Para cambiar de servidor con una sesión abierta, cierra sesión y edita el campo **Servidor**.
 
 ## Compilar desde el código fuente
 
-Instala las dependencias PHP con Composer en `backend` y las de JavaScript con `npm ci` en `frontend`. Desde la raíz, ejecuta `compilar.ps1` para generar la web. Para generar el APK de pruebas, instala también las dependencias de `frontend/src-capacitor` y ejecuta `compilar.ps1 -Android` con Java 21 y Android SDK 36.
+Instala las dependencias PHP con Composer en `backend` y las de JavaScript con `npm ci` en `frontend`. Desde la raíz, ejecuta `.\compilar.ps1` para generar la web.
+
+Para compilar Android, ejecuta también `npm ci` en `frontend/src-capacitor`. Usa Java 21 (`JAVA_HOME` o `-JavaHome`) y Android SDK 36 (`ANDROID_HOME` o la ubicación de Android Studio en `%LOCALAPPDATA%\Android\Sdk`). Desde la raíz, ejecuta lo siguiente.
+
+```powershell
+.\compilar.ps1 -Android
+```
+
+El script genera **Alquiler-de-cancha.apk** en la raíz. Es un APK de pruebas (debug), que admite HTTP para direcciones IPv4 privadas en la red local.
+
+Para incluir un servidor inicial, define `CANCHAS_SERVIDOR` antes de compilar.
+
+```powershell
+$env:CANCHAS_SERVIDOR = 'https://canchas.ejemplo.com'
+.\compilar.ps1 -Android
+Remove-Item Env:CANCHAS_SERVIDOR
+```
+
+El APK intenta conectarse al servidor inicial cuando todavía no hay una dirección guardada. El campo sigue disponible para conectar con otro servidor, incluida la dirección HTTP que imprime `iniciar.ps1 -RedLocal`. También puedes compilar con esa dirección local como valor inicial.
+
+## Preparar una publicación en Google Play
+
+1. Aloja Laravel detrás de un servidor web que sirva `backend/public` con un certificado HTTPS válido. Configura la base de datos y genera `APP_KEY`. Crea la primera cuenta con la aplicación en `APP_ENV=local` y accesible solo desde el servidor. Antes de exponer el sitio, cambia a `APP_ENV=production`, establece `APP_DEBUG=false` y vuelve a generar la caché de configuración con `php artisan config:cache` desde `backend`. En producción se desactiva la creación de la primera cuenta por HTTP.
+2. Introduce la dirección HTTPS del sitio al compilar el Android App Bundle. La app usará esa dirección en el primer inicio.
+
+   ```powershell
+   $env:CANCHAS_SERVIDOR = 'https://canchas.ejemplo.com'
+   .\compilar.ps1 -Publicacion
+   Remove-Item Env:CANCHAS_SERVIDOR
+   ```
+
+3. Firma `Alquiler-de-cancha-sin-firmar.aab` con la clave de subida asociada a tu cuenta de Play Console. `jarsigner` solicitará la contraseña. Guarda la clave fuera del repositorio e incrementa `versionCode` en `frontend/src-capacitor/android/app/build.gradle` para cada entrega.
+
+   ```powershell
+   jarsigner -keystore 'C:\ruta\subida.jks' -signedjar Alquiler-de-cancha.aab Alquiler-de-cancha-sin-firmar.aab alias-de-subida
+   jarsigner -verify Alquiler-de-cancha.aab
+   ```
+
+4. Sube el AAB firmado a una pista de pruebas en Play Console. Comprueba el acceso, las reservas y el cierre de sesión en un dispositivo con el servidor HTTPS definitivo. Completa la ficha, las declaraciones de privacidad y los datos de acceso para revisión antes de solicitar producción. [Publicar con Play Console](https://support.google.com/googleplay/android-developer/answer/9859152?hl=es)
+
+La aplicación está destinada a administrar una cancha. Los clientes registrados son contactos asociados a reservas. El inicio de sesión usa la cuenta administrativa del servidor.
+
+Para preparar un paquete de publicación, establece `CANCHAS_SERVIDOR` con la dirección HTTPS pública y ejecuta `.\compilar.ps1 -Publicacion`. Esta variante acepta conexiones HTTPS y genera **Alquiler-de-cancha-sin-firmar.aab** en la raíz para firmarlo antes de publicarlo.

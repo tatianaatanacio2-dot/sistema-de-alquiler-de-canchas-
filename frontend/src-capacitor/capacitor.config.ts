@@ -4,5 +4,6 @@ export default defineCapacitorConfig({
   appId: 'pe.alquilercancha.app',
   appName: 'Alquiler de cancha',
   webDir: 'www',
-  plugins: { CapacitorHttp: { enabled: true } },
+  // La API usa CapacitorHttp.request directamente.
+  plugins: { CapacitorHttp: { enabled: false } },
 });

@@ -1,7 +1,7 @@
 <template>
   <q-page class="workspace">
     <div class="page-heading">
-      <div><span class="eyebrow">GESTIÓN DE ALQUILERES</span><h1>Reservas</h1><p>Consulta la agenda y el historial de la cancha.</p></div>
+      <div><h1>Reservas</h1><p>Consulta la agenda y el historial de la cancha.</p></div>
       <div class="row q-gutter-sm">
         <q-btn outline color="primary" no-caps icon="event_available" label="Horarios libres" to="/agenda" />
         <q-btn color="primary" unelevated no-caps icon="add" label="Nueva reserva" @click="editar()" />
@@ -9,18 +9,51 @@
     </div>
     <q-banner v-if="error" rounded class="bg-red-1 text-red-9 q-mb-md" role="alert">{{ error }}</q-banner>
     <section class="panel">
-      <div class="table-toolbar">
+      <div class="table-toolbar reservation-toolbar">
         <q-input v-model="busqueda" class="table-search" outlined dense clearable placeholder="Buscar por cliente…" aria-label="Buscar por cliente">
           <template #prepend><q-icon name="search" /></template>
         </q-input>
-        <div class="row items-center q-gutter-sm">
+        <div class="reservation-filters">
           <q-input v-model="fecha" type="date" stack-label outlined dense clearable label="Fecha" />
-          <q-select v-model="estado" :options="opcionesEstado" emit-value map-options clearable outlined dense label="Estado" style="min-width: 145px" />
-          <q-btn flat round dense icon="refresh" aria-label="Actualizar reservas" @click="cargar" />
+          <q-select v-model="estado" :options="opcionesEstado" emit-value map-options clearable outlined dense label="Estado" />
+          <q-btn flat round icon="refresh" aria-label="Actualizar reservas" @click="cargar" />
         </div>
       </div>
-      <q-table flat class="data-table" :rows="reservas" :columns="columnas" :filter="busqueda || ''" :loading="cargando"
+      <q-table flat class="data-table" :grid="q.screen.width < 1250" :rows="reservas" :columns="columnas" :filter="busqueda || ''" :filter-method="filtrarPorCliente" :loading="cargando"
         row-key="id" :pagination="{ rowsPerPage: 10 }" no-data-label="Aún no hay reservas para mostrar" no-results-label="No se encontraron coincidencias">
+        <template #item="{ row }">
+          <div class="col-12 col-sm-6 record-item">
+            <q-card flat bordered class="record-card">
+              <q-card-section>
+                <div class="record-heading">
+                  <h3>{{ row.cliente }}</h3>
+                  <q-badge outline :color="colores[row.estado as Estado]" :label="estados[row.estado as Estado]" />
+                </div>
+                <dl class="record-details">
+                  <div><dt>Inicio</dt><dd>{{ horario(row.inicio) }}</dd></div>
+                  <div><dt>Fin</dt><dd>{{ horario(row.fin) }}</dd></div>
+                  <div><dt>Total</dt><dd class="text-weight-bold">{{ dinero(row.total) }}</dd></div>
+                  <div><dt>Abonado</dt><dd>{{ dinero(row.abonado) }}</dd></div>
+                  <div><dt>{{ row.estado === 'cancelada' ? 'Por devolver' : 'Saldo' }}</dt><dd>{{ dinero(saldoReserva(row)) }}</dd></div>
+                  <div><dt>Pago</dt><dd><q-badge outline :color="estadoPago(row).color" :label="estadoPago(row).label" /></dd></div>
+                </dl>
+              </q-card-section>
+              <q-card-actions class="record-actions">
+                <q-btn flat no-caps color="primary" icon="payments" label="Pagos" :to="{ path: '/pagos', query: { reserva: String(row.id) } }" />
+                <q-btn flat no-caps color="primary" icon="print" label="Constancia" :to="'/reservas/' + row.id + '/constancia'" />
+                <template v-if="row.estado === 'confirmada'">
+                  <q-btn flat no-caps color="green-8" icon="chat" label="WhatsApp" :href="enlaceWhatsApp(row)"
+                    target="_blank" rel="noopener" :disable="!telefonoContacto(row)" />
+                  <q-btn flat no-caps color="primary" icon="edit" label="Editar" @click="editar(row)" />
+                  <q-btn v-if="row.fin <= horaLocal()" flat no-caps color="green-9" label="Completar" @click="cambiarEstado(row, 'completada')" />
+                  <q-btn flat no-caps color="red-8" label="Cancelar" @click="cambiarEstado(row, 'cancelada')" />
+                </template>
+                <q-btn v-else-if="row.estado === 'cancelada'" flat no-caps color="primary" icon="event_repeat"
+                  label="Reservar de nuevo" @click="reservarDeNuevo(row)" />
+              </q-card-actions>
+            </q-card>
+          </div>
+        </template>
         <template #body-cell-estado="props"><q-td :props="props">
           <q-badge outline :color="colores[props.row.estado as Estado]" :label="estados[props.row.estado as Estado]" />
         </q-td></template>
@@ -46,7 +79,7 @@
         </q-td></template>
       </q-table>
     </section>
-    <q-dialog v-model="abierto" :persistent="guardando">
+    <q-dialog v-model="abierto" :persistent="guardando" :maximized="q.screen.lt.sm">
       <q-card class="dialog-card">
         <q-card-section><h2>{{ datos.id ? 'Editar reserva' : 'Nueva reserva' }}</h2><div class="text-caption text-grey-7">{{ cancha?.nombre }}</div></q-card-section>
         <q-separator />
@@ -113,6 +146,10 @@
             <div class="full-field row justify-between items-center q-gutter-sm">
               <span class="text-caption text-grey-7">Hora de Bogotá · {{ dinero(tarifa) }} por hora</span>
               <strong v-if="importe !== null">Total estimado {{ dinero(importe) }}</strong>
+            </div>
+            <div v-if="datos.inicio" class="full-field row q-gutter-xs">
+              <q-btn v-for="minutos in [30, 60, 90]" :key="minutos" outline no-caps color="primary"
+                :label="`${minutos} min`" @click="fijarDuracion(minutos)" />
             </div>
             <template v-if="!datos.id">
               <q-separator class="full-field" />
@@ -186,7 +223,7 @@ const pago = ref({ operacion: uid(), monto: '', metodo: 'efectivo' as Metodo, no
 const tarifa = computed(() => datos.value.tarifa ?? cancha.value?.tarifa ?? 0);
 const importe = computed(() => {
   const minutos = (Date.parse(datos.value.fin + 'Z') - Date.parse(datos.value.inicio + 'Z')) / 60000;
-  return minutos > 0 ? tarifa.value * minutos / 60 : null;
+  return minutos > 0 ? Math.round(tarifa.value * 100 * minutos / 60) / 100 : null;
 });
 const vistaRepeticiones = computed(() => {
   if (!repetirSemanal.value || !datos.value.inicio || !datos.value.fin) return [];
@@ -220,6 +257,23 @@ const reloj = new Intl.DateTimeFormat('sv-SE', {
 });
 const horaLocal = () => reloj.format(new Date()).replace(' ', 'T');
 const esFechaRapida = (dias: 0 | 1) => datos.value.inicio.slice(0, 10) === fechaBogota(dias);
+const comparar = new Intl.Collator('es', { sensitivity: 'base', usage: 'search' });
+function filtrarPorCliente(filas: readonly Reserva[], termino: string) {
+  const consulta = termino.trim().normalize('NFC');
+  if (!consulta) return filas.slice();
+  return filas.filter(({ cliente }) => {
+    const nombre = cliente.normalize('NFC');
+    for (let i = 0; i <= nombre.length - consulta.length; i++) {
+      if (comparar.compare(nombre.slice(i, i + consulta.length), consulta) === 0) return true;
+    }
+    return false;
+  });
+}
+
+function fijarDuracion(minutos: number) {
+  const inicio = Date.parse(datos.value.inicio + 'Z');
+  if (Number.isFinite(inicio)) datos.value.fin = new Date(inicio + minutos * 60000).toISOString().slice(0, 16);
+}
 const etiquetaCliente = (cliente?: Cliente) => cliente
   ? cliente.nombre || cliente.dni || cliente.telefono || 'Cliente #' + cliente.id
   : '';
