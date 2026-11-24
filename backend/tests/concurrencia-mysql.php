@@ -4,11 +4,10 @@
 // Nunca cambia ni elimina canchas_alquiler. Requiere permiso CREATE DATABASE local.
 require __DIR__.'/../vendor/autoload.php';
 $app = require __DIR__.'/../bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Http\Controllers\AlquilerController;
 use App\Http\Controllers\FinanzasController;
-use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

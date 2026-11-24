@@ -152,6 +152,17 @@
                   <q-btn
                     flat
                     no-caps
+                    color="green-8"
+                    icon="chat"
+                    label="WhatsApp"
+                    :href="enlaceWhatsApp(row)"
+                    target="_blank"
+                    rel="noopener"
+                    :disable="!telefonoContacto(row)"
+                  />
+                  <q-btn
+                    flat
+                    no-caps
                     color="primary"
                     icon="edit"
                     label="Editar"
@@ -173,6 +184,15 @@
                     @click="cambiarEstado(row, 'cancelada')"
                   />
                 </template>
+                <q-btn
+                  v-else-if="row.estado === 'cancelada'"
+                  flat
+                  no-caps
+                  color="primary"
+                  icon="event_repeat"
+                  label="Reservar de nuevo"
+                  @click="reservarDeNuevo(row)"
+                />
               </q-card-actions>
             </q-card>
           </div>
@@ -202,6 +222,19 @@
         <template #body-cell-acciones="props"
           ><q-td :props="props">
             <div class="reservation-table-actions">
+              <q-btn
+                flat
+                dense
+                round
+                color="green-8"
+                icon="chat"
+                aria-label="Confirmar por WhatsApp"
+                title="Preparar mensaje de WhatsApp"
+                :href="enlaceWhatsApp(props.row)"
+                target="_blank"
+                rel="noopener"
+                :disable="!telefonoContacto(props.row)"
+              />
               <q-btn
                 flat
                 dense
@@ -248,7 +281,17 @@
                   @click="cambiarEstado(props.row, 'cancelada')"
                 />
               </template>
-            </div> </q-td
+
+              <q-btn
+                v-if="props.row.estado === 'cancelada'"
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="event_repeat"
+                label="Reservar de nuevo"
+                @click="reservarDeNuevo(props.row)"
+              /> </div></q-td
         ></template>
       </q-table>
     </section>
@@ -358,26 +401,106 @@
                 maxlength="120"
               />
             </template>
-            <q-input
-              v-model="datos.inicio"
-              outlined
-              stack-label
-              type="datetime-local"
-              label="Inicio"
-              :rules="[v => !!v || 'Indica el inicio']"
-            />
-            <q-input
-              v-model="datos.fin"
-              outlined
-              stack-label
-              type="datetime-local"
-              label="Fin"
-              :rules="[
-                v =>
-                  (!!v && v > datos.inicio) ||
-                  'El fin debe ser posterior al inicio'
-              ]"
-            />
+            <div class="full-field">
+              <div class="text-caption text-grey-7 q-mb-xs">Fecha rápida</div>
+              <div class="row q-gutter-sm">
+                <q-btn
+                  :outline="!esFechaRapida(0)"
+                  color="primary"
+                  no-caps
+                  icon="today"
+                  label="Hoy"
+                  @click="aplicarFechaRapida(0)"
+                />
+                <q-btn
+                  :outline="!esFechaRapida(1)"
+                  color="primary"
+                  no-caps
+                  icon="event"
+                  label="Mañana"
+                  @click="aplicarFechaRapida(1)"
+                />
+                <q-input
+                  v-model="fechaElegida"
+                  type="date"
+                  outlined
+                  dense
+                  label="Elegir fecha"
+                  :min="fechaBogota(0)"
+                  style="min-width: 170px"
+                  @update:model-value="aplicarOtraFecha"
+                />
+              </div>
+              <div
+                v-if="datos.inicio && datos.fin"
+                class="text-caption text-grey-7 q-mt-sm"
+              >
+                Horario seleccionado: {{ horario(datos.inicio) }} –
+                {{ datos.fin.slice(11, 16) }}
+              </div>
+              <div class="row q-gutter-sm q-mt-sm">
+                <q-input
+                  class="col"
+                  :model-value="datos.inicio.slice(11, 16)"
+                  type="time"
+                  outlined
+                  dense
+                  label="Hora de inicio"
+                  :disable="!datos.inicio"
+                  @update:model-value="actualizarHora('inicio', $event)"
+                />
+                <q-input
+                  class="col"
+                  :model-value="datos.fin.slice(11, 16)"
+                  type="time"
+                  outlined
+                  dense
+                  label="Hora de fin"
+                  :disable="!datos.fin"
+                  @update:model-value="actualizarHora('fin', $event)"
+                />
+              </div>
+            </div>
+            <div v-if="!datos.id" class="full-field">
+              <q-toggle
+                v-model="repetirSemanal"
+                label="Repetir reserva cada semana"
+                @update:model-value="cargarVistaRepeticiones"
+              />
+              <div v-if="repetirSemanal" class="q-mt-sm">
+                <q-input
+                  v-model.number="cantidadRepeticiones"
+                  type="number"
+                  outlined
+                  dense
+                  label="Cantidad de fechas (incluye esta)"
+                  min="2"
+                  max="52"
+                  style="max-width: 240px"
+                  @update:model-value="normalizarCantidad"
+                />
+                <div
+                  v-if="vistaRepeticiones.length"
+                  class="text-caption q-mt-sm"
+                >
+                  <div
+                    v-for="ocurrencia in vistaRepeticiones"
+                    :key="ocurrencia.inicio"
+                    class="row items-center q-gutter-sm q-py-xs"
+                  >
+                    <span>{{ horario(ocurrencia.inicio) }}</span>
+                    <q-badge
+                      :color="ocurrencia.conflicto ? 'red-8' : 'green-8'"
+                      :label="
+                        ocurrencia.conflicto
+                          ? 'Cruce con otra reserva'
+                          : 'Disponible'
+                      "
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
             <div
               class="full-field row justify-between items-center q-gutter-sm"
             >
@@ -407,9 +530,12 @@
                   color="primary"
                   label="Registrar un pago al reservar"
                 />
-                <p class="text-caption text-grey-7 q-mb-none"
-                  >Registra el dinero que ya recibiste del cliente.</p
-                >
+                <p class="text-caption text-grey-7 q-mb-none">
+                  Registra el dinero que ya recibiste del cliente.
+                  <span v-if="repetirSemanal">
+                    Este pago se aplicará a cada fecha.</span
+                  >
+                </p>
               </div>
               <template v-if="cobrarAhora">
                 <q-select
@@ -489,9 +615,11 @@
               unelevated
               no-caps
               :label="
-                !datos.id && cobrarAhora
-                  ? 'Guardar reserva y pago'
-                  : 'Guardar reserva'
+                repetirSemanal && !datos.id
+                  ? `Crear ${cantidadRepeticiones} reservas`
+                  : !datos.id && cobrarAhora
+                    ? 'Guardar reserva y pago'
+                    : 'Guardar reserva'
               "
               type="submit"
               :loading="guardando"
@@ -515,6 +643,7 @@ import {
   horario,
   type Cancha,
   type Cliente,
+  type EntradaEspera,
   type Estado,
   type Reserva
 } from "@/services/api";
@@ -533,6 +662,8 @@ type Formulario = {
   inicio: string;
   fin: string;
   tarifa?: number;
+  abonado?: number | string;
+  metodo_pago?: string | null;
 };
 const q = useQuasar();
 const route = useRoute();
@@ -540,6 +671,7 @@ const router = useRouter();
 const cancha = ref<Cancha>();
 const clientes = ref<Cliente[]>([]);
 const reservas = ref<Reserva[]>([]);
+const reservasParaCruces = ref<Reserva[]>([]);
 const fecha = ref("");
 const estado = ref<Estado | null>(null);
 const busqueda = ref("");
@@ -548,8 +680,12 @@ const errorFormulario = ref("");
 const cargando = ref(false);
 const guardando = ref(false);
 const abierto = ref(false);
+const fechaElegida = ref("");
 const datos = ref<Formulario>({ id: 0, cliente_id: null, inicio: "", fin: "" });
+const repetirSemanal = ref(false);
+const cantidadRepeticiones = ref(4);
 const registroNuevo = ref(false);
+const esperaId = ref<number | null>(null);
 const nuevoCliente = ref({ dni: "", nombre: "", telefono: "" });
 const cobrarAhora = ref(false);
 const modalidadPago = ref<"adelanto" | "completo">("adelanto");
@@ -567,6 +703,23 @@ const importe = computed(() => {
   return minutos > 0
     ? Math.round((tarifa.value * 100 * minutos) / 60) / 100
     : null;
+});
+const vistaRepeticiones = computed(() => {
+  if (!repetirSemanal.value || !datos.value.inicio || !datos.value.fin)
+    return [];
+  const filas: { inicio: string; fin: string; conflicto: boolean }[] = [];
+  for (let i = 0; i < cantidadRepeticiones.value; i++) {
+    const inicio = sumarSemanas(datos.value.inicio, i);
+    const fin = sumarSemanas(datos.value.fin, i);
+    const conflicto = reservasParaCruces.value.some(
+      reserva =>
+        reserva.estado !== "cancelada" &&
+        reserva.inicio < fin &&
+        reserva.fin > inicio
+    );
+    filas.push({ inicio, fin, conflicto });
+  }
+  return filas;
 });
 const opcionesEstado = Object.entries(estados).map(([value, label]) => ({
   value,
@@ -632,6 +785,8 @@ const reloj = new Intl.DateTimeFormat("sv-SE", {
   minute: "2-digit"
 });
 const horaLocal = () => reloj.format(new Date()).replace(" ", "T");
+const esFechaRapida = (dias: 0 | 1) =>
+  datos.value.inicio.slice(0, 10) === fechaBogota(dias);
 const comparar = new Intl.Collator("es", {
   sensitivity: "base",
   usage: "search"
@@ -665,7 +820,107 @@ const etiquetaCliente = (cliente?: Cliente) =>
       cliente.telefono ||
       "Cliente #" + cliente.id
     : "";
+
+function telefonoContacto(reserva: Reserva) {
+  const telefono =
+    reserva.cliente_telefono ||
+    clientes.value.find(cliente => cliente.id === reserva.cliente_id)
+      ?.telefono ||
+    "";
+  return telefono.replace(/\D/g, "") ? telefono : "";
+}
+
+function enlaceWhatsApp(reserva: Reserva) {
+  const digitos = telefonoContacto(reserva).replace(/\D/g, "");
+  const telefono = digitos.startsWith("51")
+    ? digitos
+    : digitos.length <= 9
+      ? "51" + digitos.replace(/^0/, "")
+      : digitos;
+  const fecha = reserva.inicio.slice(0, 10).split("-").reverse().join("/");
+  const fechaFin =
+    reserva.fin.slice(0, 10) === reserva.inicio.slice(0, 10)
+      ? ""
+      : ` Fecha de fin: ${reserva.fin.slice(0, 10).split("-").reverse().join("/")}.`;
+  const mensaje = `Hola ${reserva.cliente}, te confirmamos tu reserva. Fecha: ${fecha}.${fechaFin} Hora de inicio: ${reserva.inicio.slice(11, 16)}. Hora de fin: ${reserva.fin.slice(11, 16)}. Saldo pendiente: ${dinero(saldoReserva(reserva))}. ¿Nos confirmas, por favor?`;
+  return "https://wa.me/" + telefono + "?text=" + encodeURIComponent(mensaje);
+}
 let secuencia = 0;
+
+function fechaBogota(dias: number) {
+  const [anio, mes, dia] = horaLocal().slice(0, 10).split("-").map(Number);
+  return new Date(Date.UTC(anio, mes - 1, dia + dias))
+    .toISOString()
+    .slice(0, 10);
+}
+
+function aplicarFechaRapida(dias: 0 | 1) {
+  aplicarFecha(fechaBogota(dias));
+}
+
+function aplicarOtraFecha() {
+  if (!fechaElegida.value) return;
+  aplicarFecha(fechaElegida.value);
+}
+
+function aplicarFecha(fecha: string) {
+  fechaElegida.value = fecha;
+  const [hora, minuto] = horaLocal().slice(11, 16).split(":").map(Number);
+  const siguienteHora = Math.min(23 * 60 + 59, hora * 60 + minuto + 60);
+  const horaInicio =
+    datos.value.inicio.slice(11, 16) ||
+    String(Math.floor(siguienteHora / 60)).padStart(2, "0") + ":00";
+  let horaFin = datos.value.fin.slice(11, 16);
+  if (!horaFin) {
+    const minutosFin =
+      (Number(horaInicio.slice(0, 2)) * 60 +
+        Number(horaInicio.slice(3, 5)) +
+        60) %
+      (24 * 60);
+    horaFin =
+      String(Math.floor(minutosFin / 60)).padStart(2, "0") +
+      ":" +
+      String(minutosFin % 60).padStart(2, "0");
+  }
+  const [anio, mes, dia] = fecha.split("-").map(Number);
+  const fechaFin =
+    horaFin <= horaInicio
+      ? new Date(Date.UTC(anio, mes - 1, dia + 1)).toISOString().slice(0, 10)
+      : fecha;
+  datos.value.inicio = fecha + "T" + horaInicio;
+  datos.value.fin = fechaFin + "T" + horaFin;
+}
+
+function sumarSemanas(fechaHora: string, semanas: number) {
+  const fecha = fechaHora.slice(0, 10);
+  const [anio, mes, dia] = fecha.split("-").map(Number);
+  const futura = new Date(Date.UTC(anio, mes - 1, dia + semanas * 7))
+    .toISOString()
+    .slice(0, 10);
+  return futura + fechaHora.slice(10);
+}
+
+function normalizarCantidad() {
+  cantidadRepeticiones.value = Math.max(
+    2,
+    Math.min(52, Math.floor(cantidadRepeticiones.value || 2))
+  );
+}
+
+async function cargarVistaRepeticiones() {
+  if (!repetirSemanal.value) return;
+  try {
+    reservasParaCruces.value = await api<Reserva[]>("/reservas");
+  } catch (problema) {
+    errorFormulario.value = (problema as Error).message;
+  }
+}
+
+function actualizarHora(campo: "inicio" | "fin", hora: string | number | null) {
+  if (!hora || typeof hora !== "string") return;
+  const actual = datos.value[campo];
+  if (actual) datos.value[campo] = actual.slice(0, 11) + hora;
+}
 
 async function cargar() {
   const solicitud = ++secuencia;
@@ -686,6 +941,7 @@ async function cargar() {
 
 async function editar(reserva?: Reserva) {
   error.value = "";
+  esperaId.value = null;
   try {
     [cancha.value, clientes.value] = await Promise.all([
       api<Cancha>("/cancha"),
@@ -694,6 +950,9 @@ async function editar(reserva?: Reserva) {
     datos.value = reserva
       ? { ...reserva }
       : { id: 0, cliente_id: null, inicio: "", fin: "" };
+    repetirSemanal.value = false;
+    cantidadRepeticiones.value = 4;
+    fechaElegida.value = datos.value.inicio.slice(0, 10);
     registroNuevo.value = false;
     nuevoCliente.value = { dni: "", nombre: "", telefono: "" };
     cobrarAhora.value = false;
@@ -706,25 +965,89 @@ async function editar(reserva?: Reserva) {
   }
 }
 
+async function reservarDeNuevo(reserva: Reserva) {
+  await editar();
+  if (abierto.value) datos.value.cliente_id = reserva.cliente_id;
+}
+
 async function guardar() {
   guardando.value = true;
   errorFormulario.value = "";
   const { id, cliente_id, inicio, fin } = datos.value;
+  if (!inicio || !fin) {
+    errorFormulario.value = "Selecciona una fecha para fijar el horario.";
+    guardando.value = false;
+    return;
+  }
+  if (
+    repetirSemanal.value &&
+    vistaRepeticiones.value.some(ocurrencia => ocurrencia.conflicto)
+  ) {
+    errorFormulario.value =
+      "Hay fechas que se cruzan con otras reservas. Cambia la fecha u hora antes de confirmar.";
+    guardando.value = false;
+    return;
+  }
+  if (
+    cobrarAhora.value &&
+    (importe.value === null ||
+      Number(pago.value.monto) <= 0 ||
+      Number(pago.value.monto) > importe.value)
+  ) {
+    errorFormulario.value =
+      "Ingresa un pago válido que no supere el total de la reserva.";
+    guardando.value = false;
+    return;
+  }
   try {
     const cliente = registroNuevo.value
       ? { cliente_nuevo: nuevoCliente.value }
       : { cliente_id };
     const cobro = !id && cobrarAhora.value ? { pago_inicial: pago.value } : {};
-    const reserva = await api<Reserva>(
-      id ? "/reservas/" + id : "/reservas",
-      id ? "PUT" : "POST",
-      { inicio, fin, ...cliente, ...cobro }
-    );
+    const datosReserva = { inicio, fin, ...cliente, ...cobro };
+    const guardadas =
+      repetirSemanal.value && !id
+        ? await api<Reserva[]>("/reservas/repetir", "POST", {
+            ...datosReserva,
+            cantidad: cantidadRepeticiones.value
+          })
+        : [
+            await api<Reserva>(
+              id ? "/reservas/" + id : "/reservas",
+              id ? "PUT" : "POST",
+              datosReserva
+            )
+          ];
+    const reserva = guardadas[0];
+    if (registroNuevo.value && !id && reserva?.cliente_id) {
+      clientes.value = [
+        ...clientes.value,
+        { id: reserva.cliente_id, ...nuevoCliente.value, correo: "" }
+      ];
+    }
+    if (esperaId.value) {
+      try {
+        await api("/lista-espera/" + esperaId.value + "/estado", "PATCH", {
+          estado: "atendida"
+        });
+      } catch {
+        q.notify({
+          type: "warning",
+          message:
+            "Reserva creada; actualiza manualmente el estado de la lista de espera."
+        });
+      }
+      esperaId.value = null;
+    }
     abierto.value = false;
     q.notify({
       type: "positive",
-      message: "Reserva guardada · " + dinero(reserva.total)
+      message:
+        repetirSemanal.value && !id
+          ? cantidadRepeticiones.value + " reservas semanales creadas."
+          : "Reserva guardada · " + dinero(reserva.total)
     });
+    repetirSemanal.value = false;
     await cargar();
   } catch (problema) {
     errorFormulario.value = (problema as Error).message;
@@ -768,18 +1091,54 @@ function cambiarEstado(reserva: Reserva, destino: "completada" | "cancelada") {
 watch([fecha, estado], cargar);
 onMounted(async () => {
   await cargar();
+  try {
+    clientes.value = await api<Cliente[]>("/clientes");
+  } catch {
+    /* El listado sigue funcionando sin la acción de WhatsApp. */
+  }
   if (route.query.nueva) {
+    const esperaSolicitada = route.query.espera;
     const inicio =
       typeof route.query.inicio === "string" ? route.query.inicio : "";
     const fin = typeof route.query.fin === "string" ? route.query.fin : "";
     await router.replace("/reservas");
-    await editar();
-    if (
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(inicio) &&
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(fin)
-    ) {
-      datos.value.inicio = inicio;
-      datos.value.fin = fin;
+    if (esperaSolicitada) {
+      try {
+        const idEspera = Number(esperaSolicitada);
+        const [configuracion, filasClientes, solicitudes] = await Promise.all([
+          api<Cancha>("/cancha"),
+          api<Cliente[]>("/clientes"),
+          api<EntradaEspera[]>("/lista-espera")
+        ]);
+        const solicitud = solicitudes.find(fila => fila.id === idEspera);
+        if (!solicitud || !["disponible", "avisado"].includes(solicitud.estado))
+          throw new Error("La solicitud ya no está disponible para reservar.");
+        cancha.value = configuracion;
+        clientes.value = filasClientes;
+        datos.value = {
+          id: 0,
+          cliente_id: solicitud.cliente_id,
+          inicio: solicitud.inicio,
+          fin: solicitud.fin
+        };
+        fechaElegida.value = solicitud.inicio.slice(0, 10);
+        esperaId.value = solicitud.id;
+        registroNuevo.value = false;
+        errorFormulario.value = "";
+        abierto.value = true;
+      } catch (problema) {
+        error.value = (problema as Error).message;
+      }
+    } else {
+      await editar();
+      if (
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(inicio) &&
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(fin)
+      ) {
+        datos.value.inicio = inicio;
+        datos.value.fin = fin;
+        fechaElegida.value = inicio.slice(0, 10);
+      }
     }
   }
 });

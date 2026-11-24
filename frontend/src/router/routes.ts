@@ -37,6 +37,11 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "Constancia de reserva" }
       },
       {
+        path: "lista-espera",
+        component: () => import("@/pages/ListaEsperaPage.vue"),
+        meta: { title: "Lista de espera" }
+      },
+      {
         path: "reservas",
         component: () => import("@/pages/ReservasPage.vue"),
         meta: { title: "Reservas" }

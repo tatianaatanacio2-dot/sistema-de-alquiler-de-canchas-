@@ -24,13 +24,32 @@ export type Reserva = {
   id: number;
   cliente_id: number | null;
   cliente: string;
+  cliente_telefono?: string | null;
   inicio: string;
   fin: string;
   tarifa: number;
   total: string;
   estado: Estado;
-  abonado: string;
+  abonado: number | string;
   metodo_pago: string | null;
+  pagado?: number | string;
+  saldo?: number | string;
+};
+export type Pago = {
+  id: number;
+  reserva_id: number;
+  monto: string;
+  metodo: string;
+  referencia: string | null;
+  registrado_en: string;
+};
+export type EntradaEspera = {
+  id: number;
+  cliente_id: number;
+  cliente: string;
+  inicio: string;
+  fin: string;
+  estado: "pendiente" | "disponible" | "avisado" | "atendida" | "cancelada";
 };
 export type Acceso = { requiereCuenta: boolean; equipoLocal: boolean };
 type Credenciales = { token: string; usuario: Usuario };

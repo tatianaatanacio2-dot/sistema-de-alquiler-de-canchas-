@@ -106,7 +106,8 @@ const navegacion = [
   { ruta: "/", nombre: "Resumen", icono: "space_dashboard" },
   { ruta: "/reservas", nombre: "Reservas", icono: "calendar_month" },
   { ruta: "/clientes", nombre: "Clientes", icono: "people_outline" },
-  { ruta: "/cancha", nombre: "Cancha", icono: "sports_soccer" }
+  { ruta: "/cancha", nombre: "Cancha", icono: "sports_soccer" },
+  { ruta: "/lista-espera", nombre: "Lista de espera", icono: "hourglass_top" }
 ];
 const gestion = [
   {

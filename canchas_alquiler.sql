@@ -39,3 +39,15 @@ CREATE TABLE IF NOT EXISTS reservas (
     FOREIGN KEY (cliente_id) REFERENCES clientes(id),
     INDEX reservas_horario (cancha_id, inicio, fin)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS lista_espera (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    cliente_id INT UNSIGNED NOT NULL,
+    inicio CHAR(16) NOT NULL,
+    fin CHAR(16) NOT NULL,
+    estado ENUM('pendiente', 'disponible', 'avisado', 'atendida', 'cancelada') NOT NULL DEFAULT 'pendiente',
+    creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (inicio < fin),
+    FOREIGN KEY (cliente_id) REFERENCES clientes(id),
+    INDEX lista_espera_horario (estado, inicio, fin)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

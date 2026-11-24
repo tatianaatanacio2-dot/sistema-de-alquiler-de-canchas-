@@ -9,6 +9,7 @@ export type Pago = {
   metodo: Metodo;
   nota: string;
   fecha: string;
+  version?: string;
 };
 export type Totales = {
   ingresos: string;

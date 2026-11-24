@@ -58,6 +58,8 @@ Los primeros intentos de pruebas revelaron falta de driver SQLite en el PHP auxi
 
 ## Artefactos de entrega
 
+Al integrar posteriormente los cambios remotos de `main`, se conservaron la edición de pagos, la lista de espera y las reservas repetidas. La versión integrada superó 26 pruebas de backend y 263 aserciones, TypeScript, lint y compilación web. Los paquetes Android y sus hashes de esta entrega corresponden a la compilación anterior a esa integración; deben recompilarse antes de distribuir la versión integrada.
+
 - Web compilada: `frontend/dist/spa` y copia servida en `backend/public`.
 - Código backend, migraciones y pruebas: `backend`.
 - APK release sin firma: `Alquiler-de-cancha-produccion-sin-firmar.apk`.

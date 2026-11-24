@@ -100,24 +100,26 @@
         </template>
         <template #body-cell-acciones="props">
           <q-td :props="props">
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="primary"
-              icon="history"
-              label="Historial"
-              :to="'/clientes/' + props.row.id + '/historial'"
-            />
-            <q-btn
-              flat
-              dense
-              no-caps
-              color="primary"
-              icon="edit"
-              label="Editar"
-              @click="editar(props.row)"
-            />
+            <div class="row no-wrap justify-end">
+              <q-btn
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="history"
+                label="Historial"
+                :to="'/clientes/' + props.row.id + '/historial'"
+              />
+              <q-btn
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="edit"
+                label="Editar"
+                @click="editar(props.row)"
+              />
+            </div>
           </q-td>
         </template>
       </q-table>
@@ -247,7 +249,6 @@ const columnas: QTableColumn<Cliente>[] = [
   },
   { name: "acciones", label: "Acciones", field: "id", align: "right" }
 ];
-
 async function cargar() {
   cargando.value = true;
   error.value = "";

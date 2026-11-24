@@ -1,12 +1,14 @@
 # Sistema de alquiler de cancha
 
-Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reservas con horarios sin cruces e historial de cancelaciones. La tarifa inicial es S/ 30 por hora y la agenda usa la hora de Perú (America/Lima).
+Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reservas con horarios sin cruces e historial de cancelaciones, lista de espera y reservas repetidas. La tarifa inicial es S/ 30 por hora y la agenda usa la hora de Perú (America/Lima).
 
 La preparación para VPS, Nginx, HTTPS, copias, actualizaciones y Android está en [Instalación y mantenimiento](deploy/OPERACION.md). Consulta [la auditoría y sus pruebas](deploy/AUDITORIA.md) antes de publicar. La aplicación incluye un portal de clientes con registro, reservas propias y cancelación de horarios futuros. Selecciona **Cliente** al iniciar sesión; las pantallas administrativas requieren una cuenta administrativa.
 
 En una instalación nueva basta con crear una base vacía y ejecutar `php artisan migrate --force`; las migraciones crean las tablas sin importar el SQL. Las instalaciones existentes conservan sus datos. Crea la cuenta administrativa con `php artisan canchas:administrador`, también en producción. La web y Android mantienen el token solo en memoria: al recargar o cerrar debes volver a ingresar.
 
 La rama `tatiana` incorpora Pagos, Caja diaria e Historial de cambios. Los cobros admiten adelantos y devoluciones en efectivo, Yape, Plin, transferencia o tarjeta. Caja muestra cobros, devoluciones, gastos y neto por día y método. Los cambios realizados desde la activación del historial guardan el usuario y los valores anteriores y nuevos.
+
+En Pagos → Gestionar → Movimientos registrados puedes editar el importe, método y referencia de un cobro o devolución. La corrección recalcula el saldo y la caja del día original del movimiento, y conserva los valores anteriores en el historial. Si otra pantalla modifica el mismo pago, actualiza los movimientos antes de volver a editar.
 
 Para actualizar una instalación existente, ejecuta `php artisan migrate --force` dentro de `backend`, con PHP 8.3 o superior, y después compila la interfaz con `compilar.ps1`. Cancelar una reserva conserva los pagos y permite registrar la devolución desde Pagos. Los gastos pueden anularse conservando su registro.
 
