@@ -4,6 +4,8 @@ Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reser
 
 La rama `tatiana` incorpora Pagos, Caja diaria e Historial de cambios. Los cobros admiten adelantos y devoluciones en efectivo, Yape, Plin, transferencia o tarjeta. Caja muestra cobros, devoluciones, gastos y neto por día y método. Los cambios realizados desde la activación del historial guardan el usuario y los valores anteriores y nuevos.
 
+En Pagos → Gestionar → Movimientos registrados puedes editar el importe, método y referencia de un cobro o devolución. La corrección recalcula el saldo y la caja del día original del movimiento, y conserva los valores anteriores en el historial. Si otra pantalla modifica el mismo pago, actualiza los movimientos antes de volver a editar.
+
 Para actualizar una instalación existente, ejecuta `php artisan migrate --force` dentro de `backend`, con PHP 8.3 o superior, y después compila la interfaz con `compilar.ps1`. Cancelar una reserva conserva los pagos y permite registrar la devolución desde Pagos. Los gastos pueden anularse conservando su registro.
 
 En Nueva reserva puedes registrar el adelanto o el pago completo y seleccionar el método de pago. La reserva y su cobro se guardan juntos. El listado muestra el importe abonado, el saldo y el último método utilizado.

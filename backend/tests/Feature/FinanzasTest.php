@@ -283,4 +283,69 @@ class FinanzasTest extends TestCase
         $this->flushHeaders();
         $this->getJson('/api/reportes/reservas?desde=2026-11-12&hasta=2026-11-13')->assertUnauthorized();
     }
+
+    public function test_editar_pago_actualiza_caja_saldo_y_auditoria_sin_duplicar(): void
+    {
+        $pago = $this->postJson('/api/pagos', $this->cobro('20.00'))->assertOk()->json();
+        $datos = ['monto' => '30.50', 'metodo' => 'yape', 'nota' => 'Referencia corregida', 'version' => $pago['version']];
+        $this->travelTo(now()->addDay());
+        Cache::put(SesionAdministrador::clave(str_repeat('a', 64)), hash('sha256', 'hash-de-prueba'), 3600);
+        $editado = $this->putJson('/api/pagos/'.$pago['id'], $datos)->assertOk()->assertJsonPath('fecha', $pago['fecha']);
+        $this->assertNotSame($pago['version'], $editado->json('version'));
+        $this->putJson('/api/pagos/'.$pago['id'], $datos)->assertOk();
+        $this->assertDatabaseCount('pagos', 1);
+        $this->assertDatabaseCount('historial', 2);
+        $this->getJson('/api/caja?fecha=2026-11-11')->assertOk()
+            ->assertJsonPath('totales.ingresos', '30.50')->assertJsonPath('porMetodo.yape.ingresos', '30.50')
+            ->assertJsonPath('porMetodo.efectivo.ingresos', '0.00');
+        $this->getJson('/api/caja?fecha=2026-11-12')->assertOk()->assertJsonPath('totales.ingresos', '0.00');
+        $detalle = $this->getJson('/api/reservas/'.$this->reservaId)->assertOk();
+        $this->assertEquals(30.50, $detalle->json('reserva.abonado'));
+        $historial = DB::table('historial')->where('accion', 'Editar pago')->first();
+        $this->assertEquals(20, json_decode($historial->antes)->monto);
+        $this->assertEquals(30.50, json_decode($historial->despues)->monto);
+        $this->assertSame('Encargada de prueba', $historial->usuario);
+    }
+
+    public function test_editar_pago_rechaza_sobrepago_y_ediciones_desactualizadas(): void
+    {
+        $pago = $this->postJson('/api/pagos', $this->cobro('20.00'))->assertOk()->json();
+        $datos = ['monto' => '25.00', 'metodo' => 'plin', 'nota' => '', 'version' => $pago['version']];
+        $this->putJson('/api/pagos/'.$pago['id'], $datos)->assertOk();
+        $this->putJson('/api/pagos/'.$pago['id'], array_replace($datos, ['monto' => '30.00']))->assertStatus(409);
+        $actual = $this->getJson('/api/pagos?reserva_id='.$this->reservaId)->assertOk()->json('0');
+        $this->postJson('/api/pagos', $this->cobro('35.00'))->assertOk();
+        $this->putJson('/api/pagos/'.$pago['id'], array_replace($datos, ['version' => $actual['version'], 'monto' => '25.01']))->assertStatus(409);
+        $this->assertDatabaseCount('pagos', 2);
+        $this->assertDatabaseCount('historial', 3);
+        $this->assertDatabaseHas('pagos', ['id' => $pago['id'], 'metodo' => 'plin', 'monto' => 25]);
+    }
+
+    public function test_editar_cobro_no_invalida_una_devolucion_anterior(): void
+    {
+        $primero = $this->postJson('/api/pagos', $this->cobro('30.00'))->assertOk()->json();
+        $devolucion = $this->postJson('/api/pagos', $this->cobro('30.00', 'devolucion'))->assertOk()->json();
+        $this->postJson('/api/pagos', $this->cobro('30.00'))->assertOk();
+        $this->putJson('/api/pagos/'.$primero['id'], [
+            'monto' => '20.00', 'metodo' => 'efectivo', 'nota' => '', 'version' => $primero['version'],
+        ])->assertStatus(409);
+        $this->putJson('/api/pagos/'.$devolucion['id'], [
+            'monto' => '20.00', 'metodo' => 'efectivo', 'nota' => 'Corrección', 'version' => $devolucion['version'],
+        ])->assertOk();
+        $this->assertEquals(40, $this->getJson('/api/reservas/'.$this->reservaId)->json('reserva.abonado'));
+    }
+
+    public function test_editar_pago_de_reserva_cancelada_y_validaciones(): void
+    {
+        $pago = $this->postJson('/api/pagos', $this->cobro('30.00'))->assertOk()->json();
+        $this->patchJson('/api/reservas/'.$this->reservaId.'/estado', ['estado' => 'cancelada'])->assertOk();
+        $datos = ['monto' => '25.00', 'metodo' => 'tarjeta', 'nota' => '', 'version' => $pago['version']];
+        $this->putJson('/api/pagos/'.$pago['id'], $datos)->assertOk();
+        foreach (['0', '-1.00', '1.001'] as $monto) {
+            $this->putJson('/api/pagos/'.$pago['id'], array_replace($datos, ['monto' => $monto]))->assertStatus(422);
+        }
+        $this->putJson('/api/pagos/999999', $datos)->assertNotFound();
+        $this->flushHeaders();
+        $this->putJson('/api/pagos/'.$pago['id'], $datos)->assertUnauthorized();
+    }
 }

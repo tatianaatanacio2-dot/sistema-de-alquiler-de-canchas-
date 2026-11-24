@@ -36,7 +36,8 @@ class FinanzasController
     {
         $datos = $request->validate(['reserva_id' => ['required', 'integer', 'exists:reservas,id']]);
 
-        return response()->json(DB::table('pagos')->where('reserva_id', $datos['reserva_id'])->orderByDesc('id')->get());
+        return response()->json(DB::table('pagos')->where('reserva_id', $datos['reserva_id'])->orderByDesc('id')->get()
+            ->map(fn ($pago) => $this->conVersion($pago)));
     }
 
     public function guardarPago(Request $request): JsonResponse
@@ -79,7 +80,64 @@ class FinanzasController
             return DB::table('pagos')->find($id);
         }, 3);
 
-        return response()->json($pago);
+        return response()->json($this->conVersion($pago));
+    }
+
+    public function editarPago(Request $request, int $id): JsonResponse
+    {
+        $datos = $request->validate([
+            'monto' => ['required', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
+            'metodo' => ['required', Rule::in(self::METODOS)],
+            'nota' => ['nullable', 'string', 'max:250'],
+            'version' => ['required', 'regex:/^[a-f0-9]{64}$/'],
+        ]);
+        $monto = self::centimos((string) $datos['monto']);
+        abort_unless($monto > 0, 422, 'El importe debe ser mayor que cero.');
+        $version = $datos['version'];
+        unset($datos['version']);
+        $datos['monto'] = self::soles($monto);
+        $datos['nota'] ??= '';
+        $pago = DB::transaction(function () use ($id, $datos, $version) {
+            DB::table('canchas')->where('id', 1)->lockForUpdate()->first();
+            $antes = DB::table('pagos')->where('id', $id)->lockForUpdate()->first();
+            abort_unless($antes, 404, 'El pago no existe.');
+            $actual = $this->conVersion(clone $antes);
+            $sinCambios = $actual->monto === $datos['monto'] && $actual->metodo === $datos['metodo']
+                && $actual->nota === $datos['nota'];
+            if ($sinCambios) {
+                return $antes;
+            }
+            abort_unless(hash_equals($actual->version, $version), 409,
+                'Este pago fue modificado desde otra pantalla. Cierra la edición y actualiza los movimientos antes de editarlo.');
+            $reserva = DB::table('reservas')->find($antes->reserva_id);
+            abort_unless($reserva, 404, 'La reserva del pago no existe.');
+            $saldo = 0;
+            foreach (DB::table('pagos')->where('reserva_id', $antes->reserva_id)->orderBy('id')->get() as $movimiento) {
+                $importe = (int) $movimiento->id === $id ? $datos['monto'] : $movimiento->monto;
+                $saldo += ($movimiento->tipo === 'cobro' ? 1 : -1) * self::centimos((string) $importe);
+                abort_if($saldo < 0, 409,
+                    'Este importe dejaría una devolución mayor que lo cobrado. Revisa primero las devoluciones de la reserva.');
+            }
+            abort_if($saldo > self::centimos((string) $reserva->total), 409,
+                'El importe editado haría que los pagos superen el total de la reserva.');
+            DB::table('pagos')->where('id', $id)->update($datos);
+            Historial::registrar('pagos', $id, 'Editar pago', $antes);
+
+            return DB::table('pagos')->find($id);
+        }, 3);
+
+        return response()->json($this->conVersion($pago));
+    }
+
+    private function conVersion(object $pago): object
+    {
+        $pago->monto = self::soles(self::centimos((string) $pago->monto));
+        $pago->version = hash('sha256', json_encode([
+            $pago->id, $pago->reserva_id, $pago->tipo, $pago->monto,
+            $pago->metodo, $pago->nota, $pago->fecha,
+        ], JSON_THROW_ON_ERROR));
+
+        return $pago;
     }
 
     public function caja(Request $request): JsonResponse
