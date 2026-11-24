@@ -33,9 +33,15 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo preparar Capacitor.' }
     Set-Location -LiteralPath (Join-Path $frontend 'src-capacitor/android')
     if ($Publicacion) {
-        & .\gradlew.bat --no-daemon bundleRelease
+        & .\gradlew.bat --no-daemon bundleRelease assembleRelease
         if ($LASTEXITCODE -ne 0) { throw 'No se pudo generar el paquete de publicación.' }
-        Copy-Item -LiteralPath 'app/build/outputs/bundle/release/app-release.aab' -Destination (Join-Path $PSScriptRoot 'Alquiler-de-cancha-sin-firmar.aab') -Force
+        $bundleNombre = if ($env:CANCHAS_KEYSTORE) { 'Alquiler-de-cancha.aab' } else { 'Alquiler-de-cancha-sin-firmar.aab' }
+        Copy-Item -LiteralPath 'app/build/outputs/bundle/release/app-release.aab' -Destination (Join-Path $PSScriptRoot $bundleNombre) -Force
+        if ($env:CANCHAS_KEYSTORE) {
+            Copy-Item -LiteralPath 'app/build/outputs/apk/release/app-release.apk' -Destination (Join-Path $PSScriptRoot 'Alquiler-de-cancha-produccion.apk') -Force
+        } else {
+            Copy-Item -LiteralPath 'app/build/outputs/apk/release/app-release-unsigned.apk' -Destination (Join-Path $PSScriptRoot 'Alquiler-de-cancha-produccion-sin-firmar.apk') -Force
+        }
         return
     }
     & .\gradlew.bat --no-daemon assembleDebug

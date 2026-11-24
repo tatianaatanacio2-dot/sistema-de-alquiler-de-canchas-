@@ -1,14 +1,14 @@
 param(
     [switch]$RedLocal,
-    [string]$Php = 'C:/xampp/htdocs/topico/.runtime/php/php.exe'
+    [string]$Php = ''
 )
 
 $ErrorActionPreference = 'Stop'
-if (!(Test-Path -LiteralPath $Php)) {
+if (!$Php) {
     $Php = (Get-Command php -ErrorAction Stop).Source
 }
 if ([version](& $Php -r 'echo PHP_VERSION;') -lt [version]'8.3') {
-    throw 'Laravel 13 requiere PHP 8.3 o superior. Usa el PHP de Topico o especifica -Php.'
+    throw 'Laravel 13 requiere PHP 8.3 o superior. Especifica -Php con una instalación compatible.'
 }
 
 $backend = Join-Path $PSScriptRoot 'backend'

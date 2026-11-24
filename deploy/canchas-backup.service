@@ -1,0 +1,11 @@
+[Unit]
+Description=Copia de seguridad de canchas
+After=mariadb.service
+
+[Service]
+Type=oneshot
+User=canchas
+UMask=0077
+ExecStart=/usr/bin/bash /srv/canchas/current/deploy/backup.sh
+NoNewPrivileges=true
+PrivateTmp=true

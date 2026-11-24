@@ -26,7 +26,7 @@ class AccesoController
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:80'],
             'correo' => ['required', 'email', 'max:254'],
-            'clave' => ['required', 'string', 'min:8', 'max:72'],
+            'clave' => ['required', 'string', 'min:12', 'max:72'],
         ]);
         abort_if(strlen($datos['clave']) > 72 || str_contains($datos['clave'], "\0"), 422, 'Revisa la longitud de la contraseña.');
         $admin = DB::transaction(function () use ($datos) {
@@ -52,7 +52,8 @@ class AccesoController
             'clave' => ['required', 'string', 'max:72'],
         ]);
         $admin = DB::table('administrador')->where('correo', strtolower($datos['correo']))->find(1);
-        abort_unless($admin && password_verify($datos['clave'], $admin->clave), 422, 'El correo o la contraseña son incorrectos.');
+        $valida = Hash::check($datos['clave'], $admin->clave ?? '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.');
+        abort_unless($admin && $valida, 422, 'El correo o la contraseña son incorrectos.');
 
         return $this->emitirSesion($admin);
     }
@@ -81,7 +82,7 @@ class AccesoController
 
         return response()->json([
             'token' => $token,
-            'usuario' => ['nombre' => $admin->nombre, 'correo' => $admin->correo],
+            'usuario' => ['nombre' => $admin->nombre, 'correo' => $admin->correo, 'rol' => 'administrador'],
         ])->header('Cache-Control', 'no-store');
     }
 }

@@ -23,7 +23,7 @@ class SesionAdministrador
         abort_unless($huella, 401, 'Tu sesión expiró. Vuelve a ingresar.');
         $admin = DB::table('administrador')->find(1);
         abort_unless($admin && hash_equals($huella, hash('sha256', $admin->clave)), 401, 'Inicia sesión para continuar.');
-        $request->attributes->set('admin', ['nombre' => $admin->nombre, 'correo' => $admin->correo]);
+        $request->attributes->set('admin', ['nombre' => $admin->nombre, 'correo' => $admin->correo, 'rol' => 'administrador']);
         $response = $next($request);
         $response->headers->set('Cache-Control', 'no-store');
 

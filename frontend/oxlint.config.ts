@@ -15,7 +15,8 @@ export default defineConfig({
 
   options: {
     typeAware: true,
-    typeCheck: true,
+    // vue-tsc comprueba los tipos de los archivos .vue (npm run typecheck).
+    typeCheck: false,
     maxWarnings: 10
   },
 

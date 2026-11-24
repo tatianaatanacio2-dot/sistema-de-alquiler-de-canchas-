@@ -1,6 +1,10 @@
 # Sistema de alquiler de cancha
 
-Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reservas con horarios sin cruces e historial de cancelaciones. La tarifa inicial es S/ 30 por hora y la agenda usa la hora de Bogotá.
+Agenda para una cancha de fútbol de césped sintético. Incluye clientes, reservas con horarios sin cruces e historial de cancelaciones. La tarifa inicial es S/ 30 por hora y la agenda usa la hora de Perú (America/Lima).
+
+La preparación para VPS, Nginx, HTTPS, copias, actualizaciones y Android está en [Instalación y mantenimiento](deploy/OPERACION.md). Consulta [la auditoría y sus pruebas](deploy/AUDITORIA.md) antes de publicar. La aplicación incluye un portal de clientes con registro, reservas propias y cancelación de horarios futuros. Selecciona **Cliente** al iniciar sesión; las pantallas administrativas requieren una cuenta administrativa.
+
+En una instalación nueva basta con crear una base vacía y ejecutar `php artisan migrate --force`; las migraciones crean las tablas sin importar el SQL. Las instalaciones existentes conservan sus datos. Crea la cuenta administrativa con `php artisan canchas:administrador`, también en producción. La web y Android mantienen el token solo en memoria: al recargar o cerrar debes volver a ingresar.
 
 La rama `tatiana` incorpora Pagos, Caja diaria e Historial de cambios. Los cobros admiten adelantos y devoluciones en efectivo, Yape, Plin, transferencia o tarjeta. Caja muestra cobros, devoluciones, gastos y neto por día y método. Los cambios realizados desde la activación del historial guardan el usuario y los valores anteriores y nuevos.
 
@@ -64,7 +68,7 @@ El APK intenta conectarse al servidor inicial cuando todavía no hay una direcci
 
 ## Preparar una publicación en Google Play
 
-1. Aloja Laravel detrás de un servidor web que sirva `backend/public` con un certificado HTTPS válido. Configura la base de datos y genera `APP_KEY`. Crea la primera cuenta con la aplicación en `APP_ENV=local` y accesible solo desde el servidor. Antes de exponer el sitio, cambia a `APP_ENV=production`, establece `APP_DEBUG=false` y vuelve a generar la caché de configuración con `php artisan config:cache` desde `backend`. En producción se desactiva la creación de la primera cuenta por HTTP.
+1. Aloja Laravel detrás de un servidor web que sirva `backend/public` con un certificado HTTPS válido. Configura la base de datos, conserva o genera `APP_KEY` según sea una actualización o una instalación nueva, y ejecuta las migraciones. Crea la primera cuenta con `php artisan canchas:administrador` por consola. Usa `APP_ENV=production`, `APP_DEBUG=false` y genera la caché con `php artisan config:cache`. En producción se desactiva la creación de la primera cuenta por HTTP.
 2. Introduce la dirección HTTPS del sitio al compilar el Android App Bundle. La app usará esa dirección en el primer inicio.
 
    ```powershell
@@ -82,6 +86,6 @@ El APK intenta conectarse al servidor inicial cuando todavía no hay una direcci
 
 4. Sube el AAB firmado a una pista de pruebas en Play Console. Comprueba el acceso, las reservas y el cierre de sesión en un dispositivo con el servidor HTTPS definitivo. Completa la ficha, las declaraciones de privacidad y los datos de acceso para revisión antes de solicitar producción. [Publicar con Play Console](https://support.google.com/googleplay/android-developer/answer/9859152?hl=es)
 
-La aplicación está destinada a administrar una cancha. Los clientes registrados son contactos asociados a reservas. El inicio de sesión usa la cuenta administrativa del servidor.
+La aplicación administra una cancha. Los contactos previos se conservan separados de las cuentas creadas en el nuevo portal; no se vinculan automáticamente por correo para evitar que alguien pueda apropiarse de reservas antiguas. El panel administrativo sigue usando la cuenta administrativa del servidor.
 
 Para preparar un paquete de publicación, establece `CANCHAS_SERVIDOR` con la dirección HTTPS pública y ejecuta `.\compilar.ps1 -Publicacion`. Esta variante acepta conexiones HTTPS y genera **Alquiler-de-cancha-sin-firmar.aab** en la raíz para firmarlo antes de publicarlo.

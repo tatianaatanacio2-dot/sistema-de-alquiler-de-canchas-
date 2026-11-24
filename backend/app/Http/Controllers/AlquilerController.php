@@ -112,6 +112,7 @@ class AlquilerController
     {
         $datos = array_map(fn ($valor) => $valor ?? '', $request->validate(self::CAMPOS_CLIENTE));
         $id = DB::transaction(function () use ($datos, $id) {
+            DB::table('canchas')->where('id', 1)->lockForUpdate()->first();
             if ($id === null) {
                 return $this->insertarCliente($datos);
             }
@@ -154,6 +155,8 @@ class AlquilerController
             'pago_inicial' => ['nullable', 'array:operacion,monto,metodo,nota'],
             'inicio' => ['required', 'date_format:'.self::HORARIO],
             'fin' => ['required', 'date_format:'.self::HORARIO, 'after:inicio'],
+            'total' => ['prohibited'],
+            'tarifa' => ['prohibited'],
         ], [
             'cliente_id.exists' => 'Selecciona un cliente registrado.',
             'cliente_id.prohibits' => 'Elige un cliente registrado o registra uno nuevo.',
@@ -193,6 +196,7 @@ class AlquilerController
             $inicio = CarbonImmutable::parse($datos['inicio']);
             $fin = CarbonImmutable::parse($datos['fin']);
             $minutos = intdiv($fin->getTimestamp() - $inicio->getTimestamp(), 60);
+            abort_if($minutos > 1440, 422, 'Una reserva puede durar como máximo 24 horas.');
             $centimosPorHora = $tarifa * 100;
             $centimos = intdiv($minutos, 60) * $centimosPorHora + intdiv(($minutos % 60) * $centimosPorHora + 30, 60);
             abort_if($id !== null && $centimos < FinanzasController::abonado($id), 409,

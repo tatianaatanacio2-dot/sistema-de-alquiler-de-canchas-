@@ -19,6 +19,11 @@ class PrepararDemostracion extends Command
 
     public function handle(AlquilerController $alquiler, FinanzasController $finanzas): int
     {
+        if (app()->isProduction()) {
+            $this->error('La demostración está deshabilitada en producción.');
+
+            return self::FAILURE;
+        }
         $ahora = now()->toImmutable();
         $relojAnterior = Date::getTestNow();
         $actorAnterior = request()->attributes->get('admin');

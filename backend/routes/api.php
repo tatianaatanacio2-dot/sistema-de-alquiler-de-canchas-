@@ -3,13 +3,26 @@
 use App\Http\Controllers\AccesoController;
 use App\Http\Controllers\AlquilerController;
 use App\Http\Controllers\FinanzasController;
+use App\Http\Controllers\PortalController;
 use App\Http\Middleware\SesionAdministrador;
+use App\Http\Middleware\SesionCliente;
 use Illuminate\Support\Facades\Route;
 
 Route::get('acceso', [AccesoController::class, 'estado']);
-Route::middleware('throttle:10,1')->group(function () {
+Route::middleware('throttle:acceso')->group(function () {
     Route::post('configurar', [AccesoController::class, 'configurar']);
     Route::post('ingresar', [AccesoController::class, 'ingresar']);
+    Route::post('portal/registrar', [PortalController::class, 'registrar']);
+    Route::post('portal/ingresar', [PortalController::class, 'ingresar']);
+});
+
+Route::prefix('portal')->middleware(SesionCliente::class)->group(function () {
+    Route::post('salir', [PortalController::class, 'salir']);
+    Route::get('cancha', [AlquilerController::class, 'cancha']);
+    Route::get('disponibilidad', [AlquilerController::class, 'disponibilidad']);
+    Route::get('reservas', [PortalController::class, 'reservas']);
+    Route::post('reservas', [PortalController::class, 'reservar']);
+    Route::patch('reservas/{id}/cancelar', [PortalController::class, 'cancelar'])->whereNumber('id');
 });
 
 Route::middleware(SesionAdministrador::class)->group(function () {
