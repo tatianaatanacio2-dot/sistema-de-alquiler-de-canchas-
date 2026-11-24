@@ -35,6 +35,7 @@ Route::middleware(SesionAdministrador::class)->group(function () {
     Route::patch('reservas/{id}/estado', [AlquilerController::class, 'cerrarReserva'])->whereNumber('id');
     Route::get('pagos', [FinanzasController::class, 'pagos']);
     Route::post('pagos', [FinanzasController::class, 'guardarPago']);
+    Route::put('pagos/{id}', [FinanzasController::class, 'editarPago'])->whereNumber('id');
     Route::get('caja', [FinanzasController::class, 'caja']);
     Route::post('gastos', [FinanzasController::class, 'guardarGasto']);
     Route::patch('gastos/{id}/anular', [FinanzasController::class, 'anularGasto'])->whereNumber('id');

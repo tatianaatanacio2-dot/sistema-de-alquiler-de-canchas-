@@ -39,18 +39,44 @@
           </q-card-section>
           <q-card-actions align="right">
             <q-btn flat no-caps label="Cerrar" v-close-popup :disable="guardando" />
-            <q-btn color="primary" unelevated no-caps :label="form.tipo === 'cobro' ? 'Registrar cobro' : 'Registrar devolución'" type="submit" :loading="guardando" :disable="cargandoPagos" />
+            <q-btn color="primary" unelevated no-caps :label="form.tipo === 'cobro' ? 'Registrar cobro' : 'Registrar devolución'" type="submit" :loading="guardando" :disable="cargandoPagos || Number(form.monto) <= 0" />
           </q-card-actions>
         </q-form>
         <q-separator />
-        <q-card-section><h2>Movimientos registrados</h2></q-card-section>
+        <q-card-section class="row justify-between items-center">
+          <h2>Movimientos registrados</h2>
+          <q-btn flat dense round icon="refresh" color="primary" aria-label="Actualizar movimientos" :disable="guardando || cargandoPagos" @click="actualizarMovimientos" />
+        </q-card-section>
         <q-list v-if="pagos.length" separator>
           <q-item v-for="pago in pagos" :key="pago.id">
             <q-item-section><q-item-label>{{ pago.tipo === 'cobro' ? 'Cobro' : 'Devolución' }} · {{ nombreMetodo(pago.metodo) }}</q-item-label><q-item-label caption>{{ horario(pago.fecha.replace(' ', 'T')) }}<span v-if="pago.nota"> · {{ pago.nota }}</span></q-item-label></q-item-section>
             <q-item-section side :class="pago.tipo === 'cobro' ? 'text-green-9' : 'text-orange-9'">{{ dinero(pago.monto) }}</q-item-section>
+            <q-item-section side><q-btn flat dense no-caps color="primary" icon="edit" label="Editar" :disable="guardando" @click="editarPago(pago)" /></q-item-section>
           </q-item>
         </q-list>
         <p v-else class="q-px-md text-grey-7">Esta reserva todavía no tiene pagos registrados.</p>
+      </q-card>
+    </q-dialog>
+    <q-dialog v-model="edicionAbierta" :persistent="guardandoEdicion">
+      <q-card v-if="pagoEditado" class="dialog-card">
+        <q-card-section>
+          <h2>Editar {{ pagoEditado.tipo === 'cobro' ? 'cobro' : 'devolución' }} #{{ pagoEditado.id }}</h2>
+          <p class="text-caption text-grey-7 q-mb-none">La caja se recalculará en la fecha del movimiento, {{ horario(pagoEditado.fecha.replace(' ', 'T')) }}.</p>
+        </q-card-section>
+        <q-separator />
+        <q-form @submit="guardarEdicion">
+          <q-card-section class="form-grid">
+            <q-banner v-if="errorEdicion" class="full-field bg-red-1 text-red-9" rounded role="alert">{{ errorEdicion }}</q-banner>
+            <q-input v-model="pagoEditado.monto" outlined type="number" min="0.01" max="99999999.99" step="0.01" prefix="S/" label="Importe" :rules="[validarMonto]" />
+            <q-select v-model="pagoEditado.metodo" outlined :options="metodos" emit-value map-options label="Método de pago" />
+            <q-input v-model="pagoEditado.nota" class="full-field" outlined maxlength="250"
+              :label="pagoEditado.metodo === 'efectivo' ? 'Nota (opcional)' : 'Referencia o número de operación (opcional)'" />
+          </q-card-section>
+          <q-card-actions align="right">
+            <q-btn flat no-caps label="Volver" v-close-popup :disable="guardandoEdicion" />
+            <q-btn color="primary" unelevated no-caps label="Guardar cambios" type="submit" :loading="guardandoEdicion" />
+          </q-card-actions>
+        </q-form>
       </q-card>
     </q-dialog>
   </q-page>
@@ -77,6 +103,10 @@ const cargando = ref(false);
 const cargandoPagos = ref(false);
 const guardando = ref(false);
 const abierto = ref(false);
+const edicionAbierta = ref(false);
+const pagoEditado = ref<Pago>();
+const guardandoEdicion = ref(false);
+const errorEdicion = ref('');
 const form = ref({ operacion: uid(), tipo: 'cobro' as 'cobro' | 'devolucion', monto: '', metodo: 'efectivo' as Metodo, nota: '' });
 const filas = computed(() => pendientes.value ? reservas.value.filter(item => saldo(item) > 0) : reservas.value);
 const tipos = computed(() => reserva.value?.estado === 'cancelada'
@@ -109,9 +139,38 @@ async function abrir(fila: Reserva) {
   form.value = { operacion: uid(), tipo: fila.estado === 'cancelada' ? 'devolucion' : 'cobro', monto: saldo(fila).toFixed(2), metodo: 'efectivo', nota: '' };
   abierto.value = true;
   cargandoPagos.value = true;
-  try { pagos.value = await api<Pago[]>('/pagos?reserva_id=' + fila.id); }
+  try {
+    const [movimientos, detalle] = await Promise.all([
+      api<Pago[]>('/pagos?reserva_id=' + fila.id), api<{ reserva: Reserva }>('/reservas/' + fila.id),
+    ]);
+    pagos.value = movimientos;
+    reserva.value = detalle.reserva;
+    form.value.monto = (form.value.tipo === 'devolucion' ? Number(reserva.value.abonado) : saldo(reserva.value)).toFixed(2);
+  }
   catch (problema) { errorPago.value = (problema as Error).message; }
   finally { cargandoPagos.value = false; }
+}
+async function actualizarMovimientos() {
+  if (reserva.value) await abrir(reserva.value);
+}
+function editarPago(pago: Pago) {
+  pagoEditado.value = { ...pago };
+  errorEdicion.value = '';
+  edicionAbierta.value = true;
+}
+async function guardarEdicion() {
+  if (!pagoEditado.value || guardandoEdicion.value) return;
+  guardandoEdicion.value = true;
+  errorEdicion.value = '';
+  const { id, monto, metodo, nota, version } = pagoEditado.value;
+  try {
+    await api<Pago>('/pagos/' + id, 'PUT', { monto, metodo, nota, version });
+    edicionAbierta.value = false;
+    q.notify({ type: 'positive', message: 'Pago actualizado. El saldo y la caja se recalcularon.' });
+    await cargar();
+    await actualizarMovimientos();
+  } catch (problema) { errorEdicion.value = (problema as Error).message; }
+  finally { guardandoEdicion.value = false; }
 }
 watch(() => form.value.tipo, tipo => {
   if (reserva.value) form.value.monto = (tipo === 'devolucion' ? Number(reserva.value.abonado) : saldo(reserva.value)).toFixed(2);

@@ -3,7 +3,7 @@ import type { Reserva } from './api';
 export type Metodo = 'efectivo' | 'yape' | 'plin' | 'transferencia' | 'tarjeta';
 export type Pago = {
   id: number; reserva_id: number; tipo: 'cobro' | 'devolucion'; monto: string;
-  metodo: Metodo; nota: string; fecha: string;
+  metodo: Metodo; nota: string; fecha: string; version?: string;
 };
 export type Totales = { ingresos: string; devoluciones: string; gastos: string; neto: string };
 export type Movimiento = {
